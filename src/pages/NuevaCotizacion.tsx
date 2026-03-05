@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { supabase, type Cliente } from "@/lib/supabase";
 
 interface LineItem {
   id: number;
@@ -25,9 +26,31 @@ interface LineItem {
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
   const [currency, setCurrency] = useState("CLP");
+  const [executive, setExecutive] = useState("Juan Pérez");
+  const [requirement, setRequirement] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [nextId, setNextId] = useState("COT-001");
+  const [saving, setSaving] = useState(false);
   const [items, setItems] = useState<LineItem[]>([
     { id: 1, service: "", description: "", quantity: 1, unitPrice: 0 },
   ]);
+
+  useEffect(() => {
+    async function load() {
+      const [clientesRes, cotizacionesRes] = await Promise.all([
+        supabase.from("clientes").select("*").order("name"),
+        supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
+      ]);
+      if (clientesRes.data) setClientes(clientesRes.data);
+      if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
+        const lastId = cotizacionesRes.data[0].id;
+        const num = parseInt(lastId.replace("COT-", ""), 10);
+        setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
+      }
+    }
+    load();
+  }, []);
 
   const addItem = () => {
     setItems([...items, { id: Date.now(), service: "", description: "", quantity: 1, unitPrice: 0 }]);
@@ -44,9 +67,52 @@ export default function NuevaCotizacion() {
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Cotización creada exitosamente");
+    if (!clientId) {
+      toast.error("Selecciona un cliente");
+      return;
+    }
+    setSaving(true);
+
+    const { error: cotError } = await supabase.from("cotizaciones").insert({
+      id: nextId,
+      client_id: clientId,
+      executive,
+      currency,
+      status: "Borrador",
+      requirement,
+      version: 1,
+    });
+
+    if (cotError) {
+      toast.error("Error al crear la cotización");
+      setSaving(false);
+      return;
+    }
+
+    const itemsToInsert = items.map((i) => ({
+      cotizacion_id: nextId,
+      service: i.service,
+      description: i.description,
+      quantity: i.quantity,
+      unit_price: i.unitPrice,
+    }));
+
+    const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsToInsert);
+    if (itemsError) {
+      toast.error("Error al guardar los items");
+      setSaving(false);
+      return;
+    }
+
+    await supabase.from("cotizacion_versiones").insert({
+      cotizacion_id: nextId,
+      version: 1,
+      status: "Vigente",
+    });
+
+    toast.success(`Cotización ${nextId} creada exitosamente`);
     navigate("/cotizaciones");
   };
 
@@ -58,59 +124,50 @@ export default function NuevaCotizacion() {
         </Button>
         <div>
           <h1 className="page-header">Nueva Cotización</h1>
-          <p className="page-subheader">COT-106 • Borrador</p>
+          <p className="page-subheader">{nextId} • Borrador</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Client Info */}
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-foreground">Información del Cliente</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label>Nombre del cliente</Label>
-              <Input placeholder="Nombre completo" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Empresa</Label>
-              <Input placeholder="Razón social" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>RUT</Label>
-              <Input placeholder="XX.XXX.XXX-X" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Correo electrónico</Label>
-              <Input type="email" placeholder="correo@empresa.cl" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Teléfono</Label>
-              <Input placeholder="+56 9 XXXX XXXX" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Dirección</Label>
-              <Input placeholder="Dirección (opcional)" />
-            </div>
+          <h2 className="font-semibold text-foreground">Cliente</h2>
+          <div className="space-y-1.5">
+            <Label>Seleccionar cliente existente</Label>
+            <Select value={clientId} onValueChange={setClientId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                {clientes.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name} — {c.rut}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Quote Info */}
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-foreground">Información de la Cotización</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
-              <Input placeholder="REQ-XXX" />
+              <Input
+                placeholder="REQ-XXX"
+                value={requirement}
+                onChange={(e) => setRequirement(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Ejecutivo responsable</Label>
-              <Select defaultValue="juan">
+              <Select value={executive} onValueChange={setExecutive}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="juan">Juan Pérez</SelectItem>
-                  <SelectItem value="maria">María García</SelectItem>
+                  <SelectItem value="Juan Pérez">Juan Pérez</SelectItem>
+                  <SelectItem value="María García">María García</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -135,7 +192,6 @@ export default function NuevaCotizacion() {
           )}
         </div>
 
-        {/* Line Items */}
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-foreground">Servicios / Productos</h2>
@@ -217,18 +273,18 @@ export default function NuevaCotizacion() {
           </div>
         </div>
 
-        {/* Validity note */}
         <div className="flex items-start gap-2 p-4 rounded-lg bg-accent text-accent-foreground text-sm border border-primary/10">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           La validez de esta cotización es de 5 días desde la fecha de emisión.
         </div>
 
-        {/* Actions */}
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => navigate("/cotizaciones")}>
             Cancelar
           </Button>
-          <Button type="submit">Crear Cotización</Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Guardando..." : "Crear Cotización"}
+          </Button>
         </div>
       </form>
     </div>

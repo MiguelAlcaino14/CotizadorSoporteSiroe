@@ -1,12 +1,7 @@
+import { useEffect, useState } from "react";
 import { FileText, Image, File } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-const docs = [
-  { name: "Aprobación COT-105.pdf", type: "Aprobación", quote: "COT-105", date: "04/03/2026", icon: FileText },
-  { name: "OC_TechSolutions_2026.pdf", type: "Orden de Compra", quote: "COT-104", date: "03/03/2026", icon: File },
-  { name: "Factura_102.pdf", type: "Factura", quote: "COT-102", date: "26/02/2026", icon: FileText },
-  { name: "Aprobacion_email.png", type: "Aprobación", quote: "COT-101", date: "20/02/2026", icon: Image },
-];
+import { supabase, type Documento } from "@/lib/supabase";
 
 const typeColors: Record<string, string> = {
   Aprobación: "bg-success/10 text-success border-success/20",
@@ -14,31 +9,63 @@ const typeColors: Record<string, string> = {
   Factura: "bg-warning/10 text-warning border-warning/20",
 };
 
+function getIcon(name: string) {
+  if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg")) return Image;
+  if (name.endsWith(".pdf")) return FileText;
+  return File;
+}
+
 export default function Documentos() {
+  const [docs, setDocs] = useState<Documento[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDocs() {
+      const { data } = await supabase
+        .from("documentos")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data) setDocs(data);
+      setLoading(false);
+    }
+    fetchDocs();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="page-header">Documentos</h1>
         <p className="page-subheader">Documentos asociados a cotizaciones</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {docs.map((d, i) => (
-          <div key={i} className="bg-card rounded-xl border shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <d.icon className="h-5 w-5 text-muted-foreground" />
+      {loading ? (
+        <div className="text-center py-8 text-sm text-muted-foreground">Cargando...</div>
+      ) : docs.length === 0 ? (
+        <div className="text-center py-8 text-sm text-muted-foreground">No hay documentos registrados.</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {docs.map((d) => {
+            const Icon = getIcon(d.name);
+            return (
+              <div key={d.id} className="bg-card rounded-xl border shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                    <Icon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {d.cotizacion_id} • {new Date(d.created_at).toLocaleDateString("es-CL")}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <Badge variant="outline" className={typeColors[d.type] ?? ""}>{d.type}</Badge>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-                <p className="text-xs text-muted-foreground">{d.quote} • {d.date}</p>
-              </div>
-            </div>
-            <div className="mt-3">
-              <Badge variant="outline" className={typeColors[d.type]}>{d.type}</Badge>
-            </div>
-          </div>
-        ))}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
