@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Info, UserPlus, FileDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, UserPlus, FileDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase, type Cliente } from "@/lib/supabase";
+import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 
 interface LineItem {
   id: number;
@@ -46,6 +47,7 @@ export default function NuevaCotizacion() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [saving, setSaving] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
   const [savingCliente, setSavingCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState<NuevoClienteForm>({
@@ -120,116 +122,26 @@ export default function NuevaCotizacion() {
   };
 
   const handleGenerarPDF = () => {
-    if (!clientId) {
+    if (!clientId || !selectedCliente) {
       toast.error("Selecciona un cliente antes de generar el PDF");
       return;
     }
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const currencySymbol = currency === "UF" ? "UF " : "$";
-    const itemsRows = items
-      .map(
-        (item) => `
-        <tr>
-          <td>${item.service}</td>
-          <td>${item.description}</td>
-          <td style="text-align:right">${item.quantity}</td>
-          <td style="text-align:right">${currencySymbol}${item.unitPrice.toLocaleString("es-CL")}</td>
-          <td style="text-align:right">${currencySymbol}${(item.quantity * item.unitPrice).toLocaleString("es-CL")}</td>
-        </tr>`
-      )
-      .join("");
-
-    const today = new Date().toLocaleDateString("es-CL");
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html lang="es">
-      <head>
-        <meta charset="UTF-8" />
-        <title>Cotización ${nextId}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 40px; }
-          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
-          .header h1 { font-size: 24px; font-weight: 700; }
-          .header .meta { text-align: right; color: #555; font-size: 12px; line-height: 1.8; }
-          .section { margin-bottom: 24px; }
-          .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 1px solid #e5e5e5; padding-bottom: 4px; margin-bottom: 10px; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-          .info-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
-          .info-row .label { color: #555; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          thead tr { background: #f5f5f5; }
-          th { text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #555; }
-          td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
-          .total-row td { border-top: 2px solid #e5e5e5; border-bottom: none; font-weight: 600; font-size: 14px; background: #fafafa; }
-          .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: center; }
-          @media print { body { padding: 20px; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <h1>Cotización</h1>
-            <div style="font-size:20px; font-weight:600; color:#444; margin-top:4px">${nextId}</div>
-          </div>
-          <div class="meta">
-            <div><strong>Fecha:</strong> ${today}</div>
-            <div><strong>Estado:</strong> Borrador</div>
-            <div><strong>Versión:</strong> v1</div>
-            ${requirement ? `<div><strong>Requerimiento:</strong> ${requirement}</div>` : ""}
-          </div>
-        </div>
-
-        <div class="grid" style="margin-bottom:24px">
-          <div class="section">
-            <div class="section-title">Cliente</div>
-            <div class="info-row"><span class="label">Empresa</span><span>${selectedCliente?.name ?? "-"}</span></div>
-            <div class="info-row"><span class="label">RUT</span><span>${selectedCliente?.rut ?? "-"}</span></div>
-            <div class="info-row"><span class="label">Email</span><span>${selectedCliente?.email ?? "-"}</span></div>
-            <div class="info-row"><span class="label">Teléfono</span><span>${selectedCliente?.phone || "-"}</span></div>
-          </div>
-          <div class="section">
-            <div class="section-title">Cotización</div>
-            <div class="info-row"><span class="label">Ejecutivo</span><span>${executive}</span></div>
-            <div class="info-row"><span class="label">Moneda</span><span>${currency}</span></div>
-            <div class="info-row"><span class="label">Validez</span><span>5 días desde emisión</span></div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Servicios / Productos</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Servicio</th>
-                <th>Descripción</th>
-                <th style="text-align:right">Cant.</th>
-                <th style="text-align:right">Valor Unit.</th>
-                <th style="text-align:right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsRows}
-              <tr class="total-row">
-                <td colspan="4" style="text-align:right">Total</td>
-                <td style="text-align:right">${currencySymbol}${total.toLocaleString("es-CL")}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="footer">
-          Este documento es una cotización comercial y no constituye una factura. Válido por 5 días desde la fecha de emisión.
-        </div>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => printWindow.print(), 300);
+    setGeneratingPDF(true);
+    try {
+      generateCotizacionPDF({
+        cotizacionId: nextId,
+        cliente: selectedCliente,
+        executive,
+        currency,
+        requirement,
+        items,
+      });
+      toast.success(`PDF ${nextId}.pdf descargado`);
+    } catch {
+      toast.error("Error al generar el PDF");
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -463,8 +375,9 @@ export default function NuevaCotizacion() {
           <Button type="button" variant="outline" onClick={() => navigate("/cotizaciones")}>
             Cancelar
           </Button>
-          <Button type="button" variant="outline" className="gap-2" onClick={handleGenerarPDF}>
-            <FileDown className="h-4 w-4" /> Generar PDF
+          <Button type="button" variant="outline" className="gap-2" onClick={handleGenerarPDF} disabled={generatingPDF}>
+            {generatingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {generatingPDF ? "Generando..." : "Generar PDF"}
           </Button>
           <Button type="submit" disabled={saving}>
             {saving ? "Guardando..." : "Crear Cotización"}
