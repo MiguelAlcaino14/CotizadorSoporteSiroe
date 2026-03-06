@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Clock, CheckCircle, Copy } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -207,21 +215,41 @@ export default function DetalleCotizacion() {
         </div>
       </div>
 
-      <div className="bg-card rounded-xl border shadow-sm p-6 space-y-3">
-        <h2 className="font-semibold text-foreground">Versiones</h2>
-        <div className="flex gap-3 flex-wrap">
-          {versions.map((v) => (
-            <div
-              key={v.id}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm ${
-                v.status === "Vigente" ? "bg-primary text-primary-foreground border-primary" : "bg-muted/30 text-muted-foreground"
-              }`}
-            >
-              {v.status === "Vigente" ? <CheckCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
-              Versión {v.version} • {new Date(v.created_at).toLocaleDateString("es-CL")}
-            </div>
-          ))}
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        <div className="p-5 border-b">
+          <h2 className="font-semibold text-foreground">Historial de Versiones</h2>
         </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Versión</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Estado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {versions.map((v) => (
+              <TableRow key={v.id}>
+                <TableCell className="font-medium">v{v.version}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(v.created_at).toLocaleDateString("es-CL")}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={
+                      v.status === "Vigente"
+                        ? "bg-success/10 text-success border-success/20"
+                        : "bg-muted text-muted-foreground border-border"
+                    }
+                  >
+                    {v.status}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">

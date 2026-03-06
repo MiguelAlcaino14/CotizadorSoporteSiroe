@@ -71,3 +71,11 @@ export type Configuracion = {
   tickets_url: string;
   updated_at: string;
 };
+
+export type Profile = {
+  id: string;
+  email: string;
+  role: "admin" | "comercial";
+  full_name: string;
+  created_at: string;
+};
