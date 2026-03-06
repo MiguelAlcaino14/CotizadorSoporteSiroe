@@ -36,14 +36,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className="px-4 py-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-accent flex items-center justify-center shrink-0">
-            <FileText className="w-4 h-4 text-sidebar-accent-foreground" />
-          </div>
-          {!collapsed && (
-            <span className="text-sidebar-primary font-semibold text-lg tracking-tight">
-              CotiSys
-            </span>
+        <div className={`py-5 flex items-center ${collapsed ? "justify-center px-2" : "px-4"}`}>
+          {collapsed ? (
+            <img
+              src="/Logo_Siroe_opc_3_B.png"
+              alt="Siroe"
+              className="w-8 h-8 object-contain"
+            />
+          ) : (
+            <img
+              src="/Logo_Siroe_opc_2_B.png"
+              alt="Siroe"
+              className="h-8 w-auto object-contain"
+            />
           )}
         </div>
         <SidebarGroup>
