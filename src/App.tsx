@@ -9,7 +9,9 @@ import Dashboard from "./pages/Dashboard";
 import Cotizaciones from "./pages/Cotizaciones";
 import NuevaCotizacion from "./pages/NuevaCotizacion";
 import DetalleCotizacion from "./pages/DetalleCotizacion";
+import Clientes from "./pages/Clientes";
 import Tickets from "./pages/Tickets";
+import Documentos from "./pages/Documentos";
 import Configuracion from "./pages/Configuracion";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -30,7 +32,9 @@ const App = () => (
               <Route path="/cotizaciones" element={<Cotizaciones />} />
               <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
               <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
+              <Route path="/clientes" element={<Clientes />} />
               <Route path="/tickets" element={<Tickets />} />
+              <Route path="/documentos" element={<Documentos />} />
               <Route path="/configuracion" element={<Configuracion />} />
             </Route>
             <Route path="*" element={<NotFound />} />

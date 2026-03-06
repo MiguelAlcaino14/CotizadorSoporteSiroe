@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Copy, Download, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase, type Cotizacion, type CotizacionItem, type CotizacionVersion, type Documento } from "@/lib/supabase";
-import { generateCotizacionPDF } from "@/lib/pdfGenerator";
 
 const statusColors: Record<string, string> = {
   Aprobada: "bg-success/10 text-success border-success/20",
@@ -50,54 +49,26 @@ export default function DetalleCotizacion() {
   const [versions, setVersions] = useState<CotizacionVersion[]>([]);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
-  const [companyName, setCompanyName] = useState("Mi Empresa TI SpA");
-  const [companyRut, setCompanyRut] = useState("76.000.000-0");
 
   useEffect(() => {
     if (!id) return;
     async function fetchData() {
-      const [quoteRes, itemsRes, versionsRes, docsRes, configRes] = await Promise.all([
+      const [quoteRes, itemsRes, versionsRes, docsRes] = await Promise.all([
         supabase.from("cotizaciones").select("*, clientes(name, rut, email, phone)").eq("id", id).maybeSingle(),
         supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
-        supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version", { ascending: false }),
+        supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version"),
         supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at"),
-        supabase.from("configuracion").select("company_name, company_rut").eq("id", 1).maybeSingle(),
       ]);
       if (quoteRes.data) setQuote(quoteRes.data as CotizacionFull);
       if (itemsRes.data) setItems(itemsRes.data);
       if (versionsRes.data) setVersions(versionsRes.data);
       if (docsRes.data) setDocumentos(docsRes.data);
-      if (configRes.data) {
-        setCompanyName(configRes.data.company_name);
-        setCompanyRut(configRes.data.company_rut);
-      }
       setLoading(false);
     }
     fetchData();
   }, [id]);
 
   const total = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
-
-  const toggleVersion = (versionId: string) => {
-    setExpandedVersions((prev) => {
-      const next = new Set(prev);
-      if (next.has(versionId)) next.delete(versionId);
-      else next.add(versionId);
-      return next;
-    });
-  };
-
-  const handleDownloadPDF = () => {
-    if (!quote) return;
-    generateCotizacionPDF({
-      quote,
-      items,
-      total,
-      companyName,
-      companyRut,
-    });
-  };
 
   const handleApprovalUpload = async () => {
     if (!id) return;
@@ -162,29 +133,17 @@ export default function DetalleCotizacion() {
       .eq("cotizacion_id", id)
       .eq("status", "Vigente");
 
-    const snapshot = items.map((i) => ({
-      service: i.service,
-      description: i.description,
-      quantity: i.quantity,
-      unit_price: i.unit_price,
-    }));
-
     await supabase.from("cotizacion_versiones").insert({
       cotizacion_id: id,
       version: newVersion,
       status: "Vigente",
-      items_snapshot: snapshot,
-      total,
-      currency: quote.currency,
-      executive: quote.executive,
-      requirement: quote.requirement,
     });
 
     await supabase.from("cotizaciones").update({ version: newVersion }).eq("id", id);
 
     const [updatedQuote, updatedVersions] = await Promise.all([
       supabase.from("cotizaciones").select("*, clientes(name, rut, email, phone)").eq("id", id).maybeSingle(),
-      supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version", { ascending: false }),
+      supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version"),
     ]);
     if (updatedQuote.data) setQuote(updatedQuote.data as CotizacionFull);
     if (updatedVersions.data) setVersions(updatedVersions.data);
@@ -226,9 +185,6 @@ export default function DetalleCotizacion() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-1" onClick={handleDownloadPDF}>
-            <Download className="h-4 w-4" /> Descargar PDF
-          </Button>
           <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
             <Copy className="h-4 w-4" /> Nueva Versión
           </Button>
@@ -261,7 +217,44 @@ export default function DetalleCotizacion() {
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <div className="p-5 border-b">
-          <h2 className="font-semibold text-foreground">Servicios / Productos (Versión Actual)</h2>
+          <h2 className="font-semibold text-foreground">Historial de Versiones</h2>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Versión</TableHead>
+              <TableHead>Fecha</TableHead>
+              <TableHead>Estado</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {versions.map((v) => (
+              <TableRow key={v.id}>
+                <TableCell className="font-medium">v{v.version}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(v.created_at).toLocaleDateString("es-CL")}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={
+                      v.status === "Vigente"
+                        ? "bg-success/10 text-success border-success/20"
+                        : "bg-muted text-muted-foreground border-border"
+                    }
+                  >
+                    {v.status}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        <div className="p-5 border-b">
+          <h2 className="font-semibold text-foreground">Servicios / Productos</h2>
         </div>
         <table className="w-full">
           <thead>
@@ -291,104 +284,6 @@ export default function DetalleCotizacion() {
             </tr>
           </tfoot>
         </table>
-      </div>
-
-      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-5 border-b">
-          <h2 className="font-semibold text-foreground">Historial de Versiones</h2>
-        </div>
-        <div className="divide-y">
-          {versions.map((v) => {
-            const isExpanded = expandedVersions.has(v.id);
-            const hasSnapshot = v.items_snapshot && v.items_snapshot.length > 0;
-            const vTotal = v.total || (hasSnapshot ? v.items_snapshot.reduce((s, i) => s + i.quantity * i.unit_price, 0) : 0);
-            const curr = v.currency || quote.currency;
-
-            return (
-              <div key={v.id}>
-                <button
-                  onClick={() => toggleVersion(v.id)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/20 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                      <span className="font-medium text-sm">v{v.version}</span>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={
-                        v.status === "Vigente"
-                          ? "bg-success/10 text-success border-success/20"
-                          : "bg-muted text-muted-foreground border-border"
-                      }
-                    >
-                      {v.status}
-                    </Badge>
-                    {v.executive && (
-                      <span className="text-xs text-muted-foreground">{v.executive}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-6">
-                    {vTotal > 0 && (
-                      <span className="text-sm font-semibold text-foreground">
-                        {curr === "UF" ? "UF " : "$"}{vTotal.toLocaleString("es-CL")}
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(v.created_at).toLocaleDateString("es-CL")}
-                    </span>
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="bg-muted/10 border-t px-5 pb-4 pt-3 space-y-3">
-                    {(v.requirement || v.executive) && (
-                      <div className="flex gap-6 text-xs text-muted-foreground pb-2">
-                        {v.executive && <span>Ejecutivo: <span className="text-foreground font-medium">{v.executive}</span></span>}
-                        {v.requirement && <span>Requerimiento: <span className="text-foreground font-medium">{v.requirement}</span></span>}
-                        {v.currency && <span>Moneda: <span className="text-foreground font-medium">{v.currency}</span></span>}
-                      </div>
-                    )}
-                    {hasSnapshot ? (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs">Servicio</TableHead>
-                            <TableHead className="text-xs">Descripción</TableHead>
-                            <TableHead className="text-xs text-right">Cant.</TableHead>
-                            <TableHead className="text-xs text-right">Val. Unit.</TableHead>
-                            <TableHead className="text-xs text-right">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {v.items_snapshot.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="text-sm py-2">{item.service}</TableCell>
-                              <TableCell className="text-sm py-2 text-muted-foreground">{item.description}</TableCell>
-                              <TableCell className="text-sm py-2 text-right">{item.quantity}</TableCell>
-                              <TableCell className="text-sm py-2 text-right">${item.unit_price.toLocaleString("es-CL")}</TableCell>
-                              <TableCell className="text-sm py-2 text-right font-medium">${(item.quantity * item.unit_price).toLocaleString("es-CL")}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">Sin detalle de items para esta versión.</p>
-                    )}
-                    {vTotal > 0 && (
-                      <div className="flex justify-end pt-1 border-t">
-                        <span className="text-sm font-bold text-primary">
-                          Total: {curr === "UF" ? "UF " : "$"}{vTotal.toLocaleString("es-CL")}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
