@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Copy } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -35,6 +35,8 @@ export default function DetalleCotizacion() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [showOCModal, setShowOCModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [hasOC, setHasOC] = useState<boolean | null>(null);
   const [quote, setQuote] = useState<CotizacionFull | null>(null);
   const [items, setItems] = useState<CotizacionItem[]>([]);
@@ -149,6 +151,19 @@ export default function DetalleCotizacion() {
     toast.success(`Nueva versión v${newVersion} creada`);
   };
 
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    const { error } = await supabase.from("cotizaciones").delete().eq("id", id);
+    if (error) {
+      toast.error("Error al eliminar la cotización");
+      setDeleting(false);
+      return;
+    }
+    toast.success(`Cotización ${id} eliminada`);
+    navigate("/cotizaciones");
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -185,6 +200,17 @@ export default function DetalleCotizacion() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
             <Copy className="h-4 w-4" /> Nueva Versión
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
+            <Pencil className="h-4 w-4" /> Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={() => setShowDeleteModal(true)}
+          >
+            <Trash2 className="h-4 w-4" /> Eliminar
           </Button>
           <Badge variant="outline" className={statusColors[quote.status]}>
             {quote.status}
@@ -341,6 +367,25 @@ export default function DetalleCotizacion() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar cotización {id}</DialogTitle>
+            <DialogDescription>
+              Esta acción no se puede deshacer. Se eliminarán todos los items, versiones y documentos asociados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Eliminar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showOCModal} onOpenChange={setShowOCModal}>
         <DialogContent>

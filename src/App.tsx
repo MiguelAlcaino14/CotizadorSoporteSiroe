@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Cotizaciones from "./pages/Cotizaciones";
 import NuevaCotizacion from "./pages/NuevaCotizacion";
 import DetalleCotizacion from "./pages/DetalleCotizacion";
+import EditarCotizacion from "./pages/EditarCotizacion";
 import Tickets from "./pages/Tickets";
 import Configuracion from "./pages/Configuracion";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/cotizaciones" element={<Cotizaciones />} />
             <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
+            <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/configuracion" element={<Configuracion />} />
           </Route>
