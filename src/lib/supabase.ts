@@ -38,24 +38,12 @@ export type CotizacionItem = {
   created_at: string;
 };
 
-export type VersionItemSnapshot = {
-  service: string;
-  description: string;
-  quantity: number;
-  unit_price: number;
-};
-
 export type CotizacionVersion = {
   id: string;
   cotizacion_id: string;
   version: number;
   status: string;
   created_at: string;
-  items_snapshot: VersionItemSnapshot[];
-  total: number;
-  currency: string;
-  executive: string;
-  requirement: string;
 };
 
 export type Ticket = {
