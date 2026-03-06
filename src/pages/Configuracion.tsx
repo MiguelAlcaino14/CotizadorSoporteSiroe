@@ -28,12 +28,10 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { supabase, type Profile } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
 import { UserPlus, Trash2 } from "lucide-react";
 
 export default function Configuracion() {
-  const { profile: currentProfile } = useAuth();
-  const isAdmin = currentProfile?.role === "admin";
+  const isAdmin = true;
 
   const [form, setForm] = useState({ company_name: "Mi Empresa TI SpA", company_rut: "76.000.000-0", tickets_url: "" });
   const [saving, setSaving] = useState(false);
@@ -231,7 +229,7 @@ export default function Configuracion() {
                     <TableCell className="font-medium">{p.full_name || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
                     <TableCell>
-                      {p.id === currentProfile?.id ? (
+                      {false ? (
                         <Badge variant="outline" className={roleColors[p.role]}>
                           {roleLabel[p.role]}
                         </Badge>
@@ -251,7 +249,7 @@ export default function Configuracion() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {p.id !== currentProfile?.id && (
+                      {true && (
                         <Button
                           variant="ghost"
                           size="icon"
