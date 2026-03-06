@@ -36,7 +36,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className={`py-4 flex items-center ${collapsed ? "justify-center px-2" : "px-2"}`}>
+        <div className={`py-4 flex items-center ${collapsed ? "justify-center px-2" : "px-0"}`}>
           {collapsed ? (
             <img
               src="/Logo_Siroe_opc_3_B.png"
@@ -47,8 +47,7 @@ export function AppSidebar() {
             <img
               src="/Logo_Siroe_opc_2_B.png"
               alt="Siroe"
-              className="h-10 w-full object-contain object-left"
-              style={{ maxWidth: "100%", display: "block" }}
+              className="w-full h-auto object-fill"
             />
           )}
         </div>
