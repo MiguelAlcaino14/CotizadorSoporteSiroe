@@ -41,13 +41,13 @@ export function AppSidebar() {
             <img
               src="/Logo_Siroe_opc_3_B.png"
               alt="Siroe"
-              className="w-8 h-8 object-contain"
+              className="w-10 h-10 object-contain"
             />
           ) : (
             <img
               src="/Logo_Siroe_opc_2_B.png"
               alt="Siroe"
-              className="h-8 w-auto object-contain"
+              className="h-12 w-auto object-contain"
             />
           )}
         </div>
