@@ -36,7 +36,7 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
-        <div className={`py-4 flex items-center ${collapsed ? "justify-center px-2" : "px-0"}`}>
+        <div className={`py-2 flex items-center ${collapsed ? "justify-center px-2" : "px-0"}`}>
           {collapsed ? (
             <img
               src="/Logo_Siroe_opc_3_B.png"
