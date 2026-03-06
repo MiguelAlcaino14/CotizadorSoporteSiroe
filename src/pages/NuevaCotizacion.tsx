@@ -169,6 +169,14 @@ export default function NuevaCotizacion() {
       toast.error("Selecciona un cliente");
       return;
     }
+    if (items.some((i) => !i.service.trim())) {
+      toast.error("Completa el nombre del servicio en todos los ítems");
+      return;
+    }
+    if (items.some((i) => i.unitPrice <= 0)) {
+      toast.error("El valor unitario debe ser mayor a 0 en todos los ítems");
+      return;
+    }
     if (hasUFItems && ufValue <= 0) {
       toast.error("Ingresa el valor de la UF");
       return;
@@ -234,7 +242,7 @@ export default function NuevaCotizacion() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-foreground">Cliente</h2>
@@ -321,7 +329,6 @@ export default function NuevaCotizacion() {
                     placeholder="Servicio"
                     value={item.service}
                     onChange={(e) => updateItem(item.id, "service", e.target.value)}
-                    required
                   />
                 </div>
                 <div className="col-span-3 space-y-1">
@@ -339,7 +346,6 @@ export default function NuevaCotizacion() {
                     min={1}
                     value={item.quantity}
                     onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                    required
                   />
                 </div>
                 <div className="col-span-2 space-y-1">
@@ -370,7 +376,6 @@ export default function NuevaCotizacion() {
                       value={item.unitPrice || ""}
                       onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
                       placeholder={item.currency === "UF" ? "Ej: 5.5" : "0"}
-                      required
                     />
                   </div>
                 </div>
