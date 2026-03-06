@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Info } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Info, UserPlus, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -12,6 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase, type Cliente } from "@/lib/supabase";
 
@@ -23,6 +29,14 @@ interface LineItem {
   unitPrice: number;
 }
 
+interface NuevoClienteForm {
+  name: string;
+  rut: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
   const [currency, setCurrency] = useState("CLP");
@@ -32,25 +46,35 @@ export default function NuevaCotizacion() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [saving, setSaving] = useState(false);
+  const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
+  const [savingCliente, setSavingCliente] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState<NuevoClienteForm>({
+    name: "",
+    rut: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
   const [items, setItems] = useState<LineItem[]>([
     { id: 1, service: "", description: "", quantity: 1, unitPrice: 0 },
   ]);
 
   useEffect(() => {
-    async function load() {
-      const [clientesRes, cotizacionesRes] = await Promise.all([
-        supabase.from("clientes").select("*").order("name"),
-        supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
-      ]);
-      if (clientesRes.data) setClientes(clientesRes.data);
-      if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
-        const lastId = cotizacionesRes.data[0].id;
-        const num = parseInt(lastId.replace("COT-", ""), 10);
-        setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
-      }
-    }
-    load();
+    loadData();
   }, []);
+
+  async function loadData() {
+    const [clientesRes, cotizacionesRes] = await Promise.all([
+      supabase.from("clientes").select("*").order("name"),
+      supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
+    ]);
+    if (clientesRes.data) setClientes(clientesRes.data);
+    if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
+      const lastId = cotizacionesRes.data[0].id;
+      const num = parseInt(lastId.replace("COT-", ""), 10);
+      setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
+    }
+  }
 
   const addItem = () => {
     setItems([...items, { id: Date.now(), service: "", description: "", quantity: 1, unitPrice: 0 }]);
@@ -66,6 +90,147 @@ export default function NuevaCotizacion() {
   };
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+
+  const selectedCliente = clientes.find((c) => c.id === clientId);
+
+  const handleGuardarNuevoCliente = async () => {
+    if (!nuevoCliente.name || !nuevoCliente.rut) {
+      toast.error("Nombre y RUT son obligatorios");
+      return;
+    }
+    setSavingCliente(true);
+    const { data, error } = await supabase
+      .from("clientes")
+      .insert(nuevoCliente)
+      .select()
+      .maybeSingle();
+    if (error) {
+      toast.error("Error al crear el cliente");
+      setSavingCliente(false);
+      return;
+    }
+    if (data) {
+      setClientes((prev) => [...prev, data as Cliente].sort((a, b) => a.name.localeCompare(b.name)));
+      setClientId(data.id);
+      toast.success(`Cliente ${data.name} creado`);
+    }
+    setShowNuevoClienteModal(false);
+    setNuevoCliente({ name: "", rut: "", email: "", phone: "", address: "" });
+    setSavingCliente(false);
+  };
+
+  const handleGenerarPDF = () => {
+    if (!clientId) {
+      toast.error("Selecciona un cliente antes de generar el PDF");
+      return;
+    }
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const currencySymbol = currency === "UF" ? "UF " : "$";
+    const itemsRows = items
+      .map(
+        (item) => `
+        <tr>
+          <td>${item.service}</td>
+          <td>${item.description}</td>
+          <td style="text-align:right">${item.quantity}</td>
+          <td style="text-align:right">${currencySymbol}${item.unitPrice.toLocaleString("es-CL")}</td>
+          <td style="text-align:right">${currencySymbol}${(item.quantity * item.unitPrice).toLocaleString("es-CL")}</td>
+        </tr>`
+      )
+      .join("");
+
+    const today = new Date().toLocaleDateString("es-CL");
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="es">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Cotización ${nextId}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 40px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
+          .header h1 { font-size: 24px; font-weight: 700; }
+          .header .meta { text-align: right; color: #555; font-size: 12px; line-height: 1.8; }
+          .section { margin-bottom: 24px; }
+          .section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #555; border-bottom: 1px solid #e5e5e5; padding-bottom: 4px; margin-bottom: 10px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+          .info-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 13px; }
+          .info-row .label { color: #555; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          thead tr { background: #f5f5f5; }
+          th { text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #555; }
+          td { padding: 8px 10px; border-bottom: 1px solid #f0f0f0; }
+          .total-row td { border-top: 2px solid #e5e5e5; border-bottom: none; font-weight: 600; font-size: 14px; background: #fafafa; }
+          .footer { margin-top: 40px; font-size: 11px; color: #888; text-align: center; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>Cotización</h1>
+            <div style="font-size:20px; font-weight:600; color:#444; margin-top:4px">${nextId}</div>
+          </div>
+          <div class="meta">
+            <div><strong>Fecha:</strong> ${today}</div>
+            <div><strong>Estado:</strong> Borrador</div>
+            <div><strong>Versión:</strong> v1</div>
+            ${requirement ? `<div><strong>Requerimiento:</strong> ${requirement}</div>` : ""}
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:24px">
+          <div class="section">
+            <div class="section-title">Cliente</div>
+            <div class="info-row"><span class="label">Empresa</span><span>${selectedCliente?.name ?? "-"}</span></div>
+            <div class="info-row"><span class="label">RUT</span><span>${selectedCliente?.rut ?? "-"}</span></div>
+            <div class="info-row"><span class="label">Email</span><span>${selectedCliente?.email ?? "-"}</span></div>
+            <div class="info-row"><span class="label">Teléfono</span><span>${selectedCliente?.phone || "-"}</span></div>
+          </div>
+          <div class="section">
+            <div class="section-title">Cotización</div>
+            <div class="info-row"><span class="label">Ejecutivo</span><span>${executive}</span></div>
+            <div class="info-row"><span class="label">Moneda</span><span>${currency}</span></div>
+            <div class="info-row"><span class="label">Validez</span><span>5 días desde emisión</span></div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Servicios / Productos</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th>Descripción</th>
+                <th style="text-align:right">Cant.</th>
+                <th style="text-align:right">Valor Unit.</th>
+                <th style="text-align:right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows}
+              <tr class="total-row">
+                <td colspan="4" style="text-align:right">Total</td>
+                <td style="text-align:right">${currencySymbol}${total.toLocaleString("es-CL")}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer">
+          Este documento es una cotización comercial y no constituye una factura. Válido por 5 días desde la fecha de emisión.
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +275,11 @@ export default function NuevaCotizacion() {
       cotizacion_id: nextId,
       version: 1,
       status: "Vigente",
+      items_snapshot: itemsToInsert.map((i) => ({ ...i, id: "", created_at: "" })),
+      total,
+      currency,
+      executive,
+      requirement,
     });
 
     toast.success(`Cotización ${nextId} creada exitosamente`);
@@ -130,7 +300,18 @@ export default function NuevaCotizacion() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-foreground">Cliente</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-foreground">Cliente</h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setShowNuevoClienteModal(true)}
+            >
+              <UserPlus className="h-4 w-4" /> Nuevo cliente
+            </Button>
+          </div>
           <div className="space-y-1.5">
             <Label>Seleccionar cliente existente</Label>
             <Select value={clientId} onValueChange={setClientId}>
@@ -282,11 +463,73 @@ export default function NuevaCotizacion() {
           <Button type="button" variant="outline" onClick={() => navigate("/cotizaciones")}>
             Cancelar
           </Button>
+          <Button type="button" variant="outline" className="gap-2" onClick={handleGenerarPDF}>
+            <FileDown className="h-4 w-4" /> Generar PDF
+          </Button>
           <Button type="submit" disabled={saving}>
             {saving ? "Guardando..." : "Crear Cotización"}
           </Button>
         </div>
       </form>
+
+      <Dialog open={showNuevoClienteModal} onOpenChange={setShowNuevoClienteModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Nombre / Razón Social <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="Empresa Ejemplo S.A."
+                value={nuevoCliente.name}
+                onChange={(e) => setNuevoCliente((p) => ({ ...p, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>RUT <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="12.345.678-9"
+                value={nuevoCliente.rut}
+                onChange={(e) => setNuevoCliente((p) => ({ ...p, rut: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="contacto@empresa.cl"
+                value={nuevoCliente.email}
+                onChange={(e) => setNuevoCliente((p) => ({ ...p, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Teléfono</Label>
+              <Input
+                placeholder="+56 9 1234 5678"
+                value={nuevoCliente.phone}
+                onChange={(e) => setNuevoCliente((p) => ({ ...p, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dirección</Label>
+              <Input
+                placeholder="Av. Ejemplo 123, Santiago"
+                value={nuevoCliente.address}
+                onChange={(e) => setNuevoCliente((p) => ({ ...p, address: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowNuevoClienteModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGuardarNuevoCliente} disabled={savingCliente}>
+              {savingCliente ? "Guardando..." : "Crear Cliente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
