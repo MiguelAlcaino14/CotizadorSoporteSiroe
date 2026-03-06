@@ -7,27 +7,29 @@ interface LineItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  currency: "CLP" | "UF";
 }
 
 interface GeneratePDFOptions {
   cotizacionId: string;
   cliente: Cliente;
   executive: string;
-  currency: string;
   requirement: string;
   items: LineItem[];
+  ufValue: number;
+  netTotal: number;
+  ivaAmount: number;
+  grandTotal: number;
 }
 
 export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
-  const { cotizacionId, cliente, executive, currency, requirement, items } = opts;
+  const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal } = opts;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   const pageW = 210;
   const margin = 16;
   const contentW = pageW - margin * 2;
   const today = new Date().toLocaleDateString("es-CL");
-  const currencySymbol = currency === "UF" ? "UF " : "$";
-  const total = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
 
   const colors = {
     primary: [30, 64, 175] as [number, number, number],
@@ -84,9 +86,11 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     ["Teléfono", cliente.phone || "-"],
   ];
 
+  const hasUF = items.some((i) => i.currency === "UF");
   const quoteRows: [string, string][] = [
     ["Ejecutivo", executive],
-    ["Moneda", currency],
+    ["Moneda", hasUF ? "CLP / UF" : "CLP"],
+    ...(hasUF && ufValue > 0 ? [["Valor UF", `$${ufValue.toLocaleString("es-CL")}`] as [string, string]] : []),
     ["Validez", "5 días desde emisión"],
   ];
 
@@ -103,9 +107,7 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     doc.text(label, margin + 2, rowY + 3);
     doc.setTextColor(...colors.text);
     const maxW = contentW / 2 - 40;
-    const truncated = doc.getTextWidth(value) > maxW
-      ? value.substring(0, 30) + "..."
-      : value;
+    const truncated = doc.getTextWidth(value) > maxW ? value.substring(0, 30) + "..." : value;
     doc.text(truncated, margin + contentW / 2 - 8, rowY + 3, { align: "right" });
   });
 
@@ -133,9 +135,9 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
   doc.text("SERVICIOS / PRODUCTOS", margin + 3, y + 4);
   y += 9;
 
-  const colWidths = [42, 70, 14, 24, 24];
-  const colHeaders = ["Servicio", "Descripción", "Cant.", "Valor Unit.", "Total"];
-  const colAligns: ("left" | "right")[] = ["left", "left", "right", "right", "right"];
+  const colWidths = [38, 62, 12, 20, 20, 26];
+  const colHeaders = ["Servicio", "Descripción", "Cant.", "Moneda", "Valor Unit.", "Total CLP"];
+  const colAligns: ("left" | "right")[] = ["left", "left", "right", "left", "right", "right"];
 
   doc.setFillColor(...colors.headerBg);
   doc.rect(margin, y, contentW, 7, "F");
@@ -152,7 +154,8 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
   y += 7;
 
   items.forEach((item, idx) => {
-    const rowTotal = item.quantity * item.unitPrice;
+    const rawTotal = item.quantity * item.unitPrice;
+    const clpTotal = item.currency === "UF" ? rawTotal * ufValue : rawTotal;
     const cellH = 7;
 
     if (idx % 2 === 0) {
@@ -162,12 +165,17 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     }
     doc.rect(margin, y, contentW, cellH, "F");
 
+    const unitDisplay = item.currency === "UF"
+      ? `UF ${item.unitPrice.toLocaleString("es-CL")}`
+      : `$${item.unitPrice.toLocaleString("es-CL")}`;
+
     const values = [
       item.service,
       item.description,
       String(item.quantity),
-      `${currencySymbol}${item.unitPrice.toLocaleString("es-CL")}`,
-      `${currencySymbol}${rowTotal.toLocaleString("es-CL")}`,
+      item.currency,
+      unitDisplay,
+      `$${Math.round(clpTotal).toLocaleString("es-CL")}`,
     ];
 
     let cx = margin;
@@ -188,17 +196,35 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     y += cellH;
   });
 
+  y += 2;
+
+  const summaryRows: [string, string][] = [
+    ["Neto", `$${Math.round(netTotal).toLocaleString("es-CL")}`],
+    ["IVA (19%)", `$${Math.round(ivaAmount).toLocaleString("es-CL")}`],
+  ];
+
+  summaryRows.forEach(([label, value]) => {
+    doc.setFillColor(...colors.white);
+    doc.rect(margin + contentW - 60, y, 60, 6, "F");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...colors.muted);
+    doc.text(label, margin + contentW - 32, y + 4);
+    doc.setTextColor(...colors.text);
+    doc.text(value, margin + contentW - 2, y + 4, { align: "right" });
+    y += 6;
+  });
+
   y += 1;
   doc.setFillColor(...colors.primary);
-  doc.rect(margin, y, contentW, 8, "F");
-  doc.setFontSize(9);
+  doc.rect(margin + contentW - 60, y, 60, 9, "F");
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...colors.white);
-  doc.text("Total", margin + contentW - 2, y + 5.5, { align: "right" });
-  doc.setFontSize(10);
-  doc.text(`${currencySymbol}${total.toLocaleString("es-CL")}`, margin + contentW - 2, y + 5.5, { align: "right" });
-  doc.text("Total", margin + 2, y + 5.5);
-  y += 14;
+  doc.text("Total", margin + contentW - 32, y + 6);
+  doc.setFontSize(9);
+  doc.text(`$${Math.round(grandTotal).toLocaleString("es-CL")}`, margin + contentW - 2, y + 6, { align: "right" });
+  y += 15;
 
   doc.setDrawColor(...colors.border);
   doc.setLineWidth(0.3);

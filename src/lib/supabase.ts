@@ -35,6 +35,7 @@ export type CotizacionItem = {
   description: string;
   quantity: number;
   unit_price: number;
+  currency: string;
   created_at: string;
 };
 

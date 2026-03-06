@@ -22,12 +22,15 @@ import { toast } from "sonner";
 import { supabase, type Cliente } from "@/lib/supabase";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 
+const IVA = 0.19;
+
 interface LineItem {
   id: number;
   service: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  currency: "CLP" | "UF";
 }
 
 interface NuevoClienteForm {
@@ -38,9 +41,13 @@ interface NuevoClienteForm {
   address: string;
 }
 
+function itemTotalCLP(item: LineItem, ufValue: number): number {
+  const base = item.quantity * item.unitPrice;
+  return item.currency === "UF" ? base * ufValue : base;
+}
+
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
-  const [currency, setCurrency] = useState("CLP");
   const [executive, setExecutive] = useState("Juan Pérez");
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
@@ -48,6 +55,7 @@ export default function NuevaCotizacion() {
   const [nextId, setNextId] = useState("COT-001");
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [ufValue, setUfValue] = useState<number>(0);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
   const [savingCliente, setSavingCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState<NuevoClienteForm>({
@@ -58,7 +66,7 @@ export default function NuevaCotizacion() {
     address: "",
   });
   const [items, setItems] = useState<LineItem[]>([
-    { id: 1, service: "", description: "", quantity: 1, unitPrice: 0 },
+    { id: 1, service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP" },
   ]);
 
   useEffect(() => {
@@ -79,7 +87,7 @@ export default function NuevaCotizacion() {
   }
 
   const addItem = () => {
-    setItems([...items, { id: Date.now(), service: "", description: "", quantity: 1, unitPrice: 0 }]);
+    setItems([...items, { id: Date.now(), service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP" }]);
   };
 
   const removeItem = (id: number) => {
@@ -91,7 +99,11 @@ export default function NuevaCotizacion() {
     setItems(items.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
   };
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
+  const hasUFItems = items.some((i) => i.currency === "UF");
+
+  const netTotal = items.reduce((sum, i) => sum + itemTotalCLP(i, ufValue), 0);
+  const ivaAmount = netTotal * IVA;
+  const grandTotal = netTotal + ivaAmount;
 
   const selectedCliente = clientes.find((c) => c.id === clientId);
 
@@ -126,15 +138,22 @@ export default function NuevaCotizacion() {
       toast.error("Selecciona un cliente antes de generar el PDF");
       return;
     }
+    if (hasUFItems && ufValue <= 0) {
+      toast.error("Ingresa el valor de la UF para generar el PDF");
+      return;
+    }
     setGeneratingPDF(true);
     try {
       generateCotizacionPDF({
         cotizacionId: nextId,
         cliente: selectedCliente,
         executive,
-        currency,
         requirement,
         items,
+        ufValue,
+        netTotal,
+        ivaAmount,
+        grandTotal,
       });
       toast.success(`PDF ${nextId}.pdf descargado`);
     } catch {
@@ -150,13 +169,17 @@ export default function NuevaCotizacion() {
       toast.error("Selecciona un cliente");
       return;
     }
+    if (hasUFItems && ufValue <= 0) {
+      toast.error("Ingresa el valor de la UF");
+      return;
+    }
     setSaving(true);
 
     const { error: cotError } = await supabase.from("cotizaciones").insert({
       id: nextId,
       client_id: clientId,
       executive,
-      currency,
+      currency: hasUFItems ? "MIXTO" : "CLP",
       status: "Borrador",
       requirement,
       version: 1,
@@ -174,6 +197,7 @@ export default function NuevaCotizacion() {
       description: i.description,
       quantity: i.quantity,
       unit_price: i.unitPrice,
+      currency: i.currency,
     }));
 
     const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsToInsert);
@@ -188,8 +212,8 @@ export default function NuevaCotizacion() {
       version: 1,
       status: "Vigente",
       items_snapshot: itemsToInsert.map((i) => ({ ...i, id: "", created_at: "" })),
-      total,
-      currency,
+      total: grandTotal,
+      currency: hasUFItems ? "MIXTO" : "CLP",
       executive,
       requirement,
     });
@@ -265,24 +289,19 @@ export default function NuevaCotizacion() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Moneda</Label>
-              <Select value={currency} onValueChange={setCurrency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLP">CLP (Peso Chileno)</SelectItem>
-                  <SelectItem value="UF">UF (Unidad de Fomento)</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Valor UF (CLP)</Label>
+              <Input
+                type="number"
+                min={0}
+                placeholder="Ej: 38500"
+                value={ufValue || ""}
+                onChange={(e) => setUfValue(parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Requerido si algún ítem se cotiza en UF
+              </p>
             </div>
           </div>
-          {currency === "UF" && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-accent text-accent-foreground text-sm">
-              <Info className="h-4 w-4 mt-0.5 shrink-0" />
-              El valor en UF se calculará según el valor vigente al momento de la facturación.
-            </div>
-          )}
         </div>
 
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
@@ -295,7 +314,7 @@ export default function NuevaCotizacion() {
 
           <div className="space-y-3">
             {items.map((item, idx) => (
-              <div key={item.id} className="grid grid-cols-12 gap-3 items-end p-3 rounded-lg bg-muted/30 border">
+              <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-3 rounded-lg bg-muted/30 border">
                 <div className="col-span-3 space-y-1">
                   {idx === 0 && <Label className="text-xs">Servicio/Producto</Label>}
                   <Input
@@ -305,7 +324,7 @@ export default function NuevaCotizacion() {
                     required
                   />
                 </div>
-                <div className="col-span-4 space-y-1">
+                <div className="col-span-3 space-y-1">
                   {idx === 0 && <Label className="text-xs">Descripción</Label>}
                   <Input
                     placeholder="Descripción"
@@ -319,9 +338,24 @@ export default function NuevaCotizacion() {
                     type="number"
                     min={1}
                     value={item.quantity}
-                    onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)}
+                    onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 1)}
                     required
                   />
+                </div>
+                <div className="col-span-2 space-y-1">
+                  {idx === 0 && <Label className="text-xs">Moneda</Label>}
+                  <Select
+                    value={item.currency}
+                    onValueChange={(v) => updateItem(item.id, "currency", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CLP">CLP</SelectItem>
+                      <SelectItem value="UF">UF</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="col-span-2 space-y-1">
                   {idx === 0 && <Label className="text-xs">Valor Unit.</Label>}
@@ -333,13 +367,7 @@ export default function NuevaCotizacion() {
                     required
                   />
                 </div>
-                <div className="col-span-1 space-y-1 text-right">
-                  {idx === 0 && <Label className="text-xs">Total</Label>}
-                  <p className="text-sm font-medium py-2 text-foreground">
-                    {(item.quantity * item.unitPrice).toLocaleString("es-CL")}
-                  </p>
-                </div>
-                <div className="col-span-1 flex justify-center">
+                <div className="col-span-1 flex justify-center pt-5">
                   <Button
                     type="button"
                     variant="ghost"
@@ -355,20 +383,36 @@ export default function NuevaCotizacion() {
             ))}
           </div>
 
-          <div className="flex justify-end border-t pt-4">
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Total</p>
-              <p className="text-2xl font-bold text-foreground">
-                {currency === "UF" ? "UF " : "$"}
-                {total.toLocaleString("es-CL")}
-              </p>
+          <div className="border-t pt-4 space-y-2">
+            <div className="flex justify-end gap-8 text-sm">
+              <span className="text-muted-foreground">Neto</span>
+              <span className="font-medium text-foreground w-32 text-right">
+                ${netTotal.toLocaleString("es-CL")}
+              </span>
             </div>
+            <div className="flex justify-end gap-8 text-sm">
+              <span className="text-muted-foreground">IVA (19%)</span>
+              <span className="font-medium text-foreground w-32 text-right">
+                ${ivaAmount.toLocaleString("es-CL")}
+              </span>
+            </div>
+            <div className="flex justify-end gap-8 border-t pt-2">
+              <span className="text-sm font-semibold text-foreground">Total</span>
+              <span className="text-2xl font-bold text-foreground w-32 text-right">
+                ${grandTotal.toLocaleString("es-CL")}
+              </span>
+            </div>
+            {hasUFItems && ufValue > 0 && (
+              <p className="text-right text-xs text-muted-foreground">
+                Valor UF utilizado: ${ufValue.toLocaleString("es-CL")}
+              </p>
+            )}
           </div>
         </div>
 
         <div className="flex items-start gap-2 p-4 rounded-lg bg-accent text-accent-foreground text-sm border border-primary/10">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
-          La validez de esta cotización es de 5 días desde la fecha de emisión.
+          La validez de esta cotización es de 5 días desde la fecha de emisión. Los precios incluyen IVA (19%).
         </div>
 
         <div className="flex justify-end gap-3">
