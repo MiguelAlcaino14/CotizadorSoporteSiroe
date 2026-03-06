@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase, type Cliente } from "@/lib/supabase";
+import { generateCotizacionPDF } from "@/lib/pdfGenerator";
 
 interface LineItem {
   id: number;
@@ -32,17 +33,24 @@ export default function NuevaCotizacion() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [saving, setSaving] = useState(false);
+  const [companyName, setCompanyName] = useState("Mi Empresa TI SpA");
+  const [companyRut, setCompanyRut] = useState("76.000.000-0");
   const [items, setItems] = useState<LineItem[]>([
     { id: 1, service: "", description: "", quantity: 1, unitPrice: 0 },
   ]);
 
   useEffect(() => {
     async function load() {
-      const [clientesRes, cotizacionesRes] = await Promise.all([
+      const [clientesRes, cotizacionesRes, configRes] = await Promise.all([
         supabase.from("clientes").select("*").order("name"),
         supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
+        supabase.from("configuracion").select("company_name, company_rut").eq("id", 1).maybeSingle(),
       ]);
       if (clientesRes.data) setClientes(clientesRes.data);
+      if (configRes.data) {
+        setCompanyName(configRes.data.company_name);
+        setCompanyRut(configRes.data.company_rut);
+      }
       if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
         const lastId = cotizacionesRes.data[0].id;
         const num = parseInt(lastId.replace("COT-", ""), 10);
@@ -106,13 +114,57 @@ export default function NuevaCotizacion() {
       return;
     }
 
+    const snapshot = items.map((i) => ({
+      service: i.service,
+      description: i.description,
+      quantity: i.quantity,
+      unit_price: i.unitPrice,
+    }));
+
     await supabase.from("cotizacion_versiones").insert({
       cotizacion_id: nextId,
       version: 1,
       status: "Vigente",
+      items_snapshot: snapshot,
+      total,
+      currency,
+      executive,
+      requirement,
     });
 
-    toast.success(`Cotización ${nextId} creada exitosamente`);
+    const selectedClient = clientes.find((c) => c.id === clientId) ?? null;
+    toast.success(`Cotización ${nextId} creada exitosamente`, {
+      action: {
+        label: "Descargar PDF",
+        onClick: () =>
+          generateCotizacionPDF({
+            quote: {
+              id: nextId,
+              executive,
+              currency,
+              status: "Borrador",
+              requirement,
+              version: 1,
+              created_at: new Date().toISOString(),
+              clientes: selectedClient
+                ? { name: selectedClient.name, rut: selectedClient.rut, email: selectedClient.email, phone: selectedClient.phone }
+                : null,
+            },
+            items: items.map((i) => ({
+              id: String(i.id),
+              cotizacion_id: nextId,
+              service: i.service,
+              description: i.description,
+              quantity: i.quantity,
+              unit_price: i.unitPrice,
+              created_at: new Date().toISOString(),
+            })),
+            total,
+            companyName,
+            companyRut,
+          }),
+      },
+    });
     navigate("/cotizaciones");
   };
 

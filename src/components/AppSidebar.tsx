@@ -1,13 +1,10 @@
 import {
   LayoutDashboard,
   FileText,
-  Users,
   Ticket,
-  FolderOpen,
   Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -22,9 +19,7 @@ import {
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Cotizaciones", url: "/cotizaciones", icon: FileText },
-  { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Tickets", url: "/tickets", icon: Ticket },
-  { title: "Documentos", url: "/documentos", icon: FolderOpen },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
