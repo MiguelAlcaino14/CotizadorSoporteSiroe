@@ -348,7 +348,7 @@ export default function NuevaCotizacion() {
                     value={item.currency}
                     onValueChange={(v) => {
                       updateItem(item.id, "currency", v);
-                      if (v === "UF") updateItem(item.id, "unitPrice", 0);
+                      updateItem(item.id, "unitPrice", 0);
                     }}
                   >
                     <SelectTrigger>
@@ -362,15 +362,17 @@ export default function NuevaCotizacion() {
                 </div>
                 <div className="col-span-2 space-y-1">
                   {idx === 0 && <Label className="text-xs">Valor Unit.</Label>}
-                  <Input
-                    type="number"
-                    min={0}
-                    value={item.currency === "UF" ? "" : item.unitPrice}
-                    onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                    disabled={item.currency === "UF"}
-                    placeholder={item.currency === "UF" ? "—" : "0"}
-                    required={item.currency !== "UF"}
-                  />
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={item.currency === "UF" ? "0.01" : "1"}
+                      value={item.unitPrice || ""}
+                      onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+                      placeholder={item.currency === "UF" ? "Ej: 5.5" : "0"}
+                      required
+                    />
+                  </div>
                 </div>
                 <div className="col-span-1 flex justify-center pt-5">
                   <Button
