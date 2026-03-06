@@ -44,6 +44,11 @@ export type CotizacionVersion = {
   version: number;
   status: string;
   created_at: string;
+  items_snapshot: CotizacionItem[] | null;
+  total: number | null;
+  currency: string | null;
+  executive: string | null;
+  requirement: string | null;
 };
 
 export type Ticket = {

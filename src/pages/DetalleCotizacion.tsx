@@ -4,14 +4,6 @@ import { ArrowLeft, Upload, FileText, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -126,6 +118,7 @@ export default function DetalleCotizacion() {
   const handleNuevaVersion = async () => {
     if (!quote || !id) return;
     const newVersion = quote.version + 1;
+    const currentTotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
 
     await supabase
       .from("cotizacion_versiones")
@@ -137,6 +130,11 @@ export default function DetalleCotizacion() {
       cotizacion_id: id,
       version: newVersion,
       status: "Vigente",
+      items_snapshot: items,
+      total: currentTotal,
+      currency: quote.currency,
+      executive: quote.executive,
+      requirement: quote.requirement,
     });
 
     await supabase.from("cotizaciones").update({ version: newVersion }).eq("id", id);
@@ -219,22 +217,25 @@ export default function DetalleCotizacion() {
         <div className="p-5 border-b">
           <h2 className="font-semibold text-foreground">Historial de Versiones</h2>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Versión</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Estado</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {versions.map((v) => (
-              <TableRow key={v.id}>
-                <TableCell className="font-medium">v{v.version}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {new Date(v.created_at).toLocaleDateString("es-CL")}
-                </TableCell>
-                <TableCell>
+        <div className="divide-y">
+          {versions.map((v) => (
+            <div key={v.id} className="p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-foreground">v{v.version}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(v.created_at).toLocaleDateString("es-CL")}
+                  </span>
+                  {v.requirement && (
+                    <span className="text-sm text-muted-foreground">Req: {v.requirement}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {v.total != null && (
+                    <span className="text-sm font-semibold text-foreground">
+                      {v.currency ?? ""} ${v.total.toLocaleString("es-CL")}
+                    </span>
+                  )}
                   <Badge
                     variant="outline"
                     className={
@@ -245,11 +246,37 @@ export default function DetalleCotizacion() {
                   >
                     {v.status}
                   </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                </div>
+              </div>
+              {v.items_snapshot && v.items_snapshot.length > 0 && (
+                <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Servicio</th>
+                        <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Descripción</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Cant.</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Valor Unit.</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {v.items_snapshot.map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-2 font-medium text-foreground">{item.service}</td>
+                          <td className="px-4 py-2 text-muted-foreground">{item.description}</td>
+                          <td className="px-4 py-2 text-right text-foreground">{item.quantity}</td>
+                          <td className="px-4 py-2 text-right text-foreground">${item.unit_price.toLocaleString("es-CL")}</td>
+                          <td className="px-4 py-2 text-right font-medium text-foreground">${(item.quantity * item.unit_price).toLocaleString("es-CL")}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
