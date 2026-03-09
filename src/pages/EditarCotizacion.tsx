@@ -48,6 +48,7 @@ export default function EditarCotizacion() {
         setExecutive(cotRes.data.executive);
         setRequirement(cotRes.data.requirement ?? "");
         setStatus(cotRes.data.status);
+        if (cotRes.data.uf_value) setUfValue(cotRes.data.uf_value);
       }
       if (itemsRes.data) {
         setItems(
@@ -103,6 +104,7 @@ export default function EditarCotizacion() {
         requirement,
         status,
         currency: hasUF ? "MIXTO" : "CLP",
+        uf_value: hasUF ? ufValue : null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);

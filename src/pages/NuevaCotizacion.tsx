@@ -173,6 +173,7 @@ export default function NuevaCotizacion() {
       status: "Borrador",
       requirement,
       version: 1,
+      uf_value: hasUFItems ? ufValue : null,
     });
 
     if (cotError) {
@@ -206,6 +207,7 @@ export default function NuevaCotizacion() {
       currency: hasUFItems ? "MIXTO" : "CLP",
       executive,
       requirement,
+      uf_value: hasUFItems ? ufValue : null,
     });
 
     toast.success(`Cotización ${nextId} creada exitosamente`);

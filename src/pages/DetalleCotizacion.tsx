@@ -69,7 +69,11 @@ export default function DetalleCotizacion() {
     fetchData();
   }, [id]);
 
-  const total = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+  const ufValue = quote?.uf_value ?? 0;
+  const total = items.reduce((s, i) => {
+    const lineTotal = i.quantity * i.unit_price;
+    return s + (i.currency === "UF" ? lineTotal * ufValue : lineTotal);
+  }, 0);
 
   const uploadFile = async (file: File, type: string, prefix: string) => {
     if (!id) return;
@@ -147,7 +151,11 @@ export default function DetalleCotizacion() {
   const handleNuevaVersion = async () => {
     if (!quote || !id) return;
     const newVersion = quote.version + 1;
-    const currentTotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const currentUfValue = quote.uf_value ?? 0;
+    const currentTotal = items.reduce((s, i) => {
+      const lineTotal = i.quantity * i.unit_price;
+      return s + (i.currency === "UF" ? lineTotal * currentUfValue : lineTotal);
+    }, 0);
 
     await supabase
       .from("cotizacion_versiones")
@@ -164,6 +172,7 @@ export default function DetalleCotizacion() {
       currency: quote.currency,
       executive: quote.executive,
       requirement: quote.requirement,
+      uf_value: currentUfValue > 0 ? currentUfValue : null,
     });
 
     await supabase.from("cotizaciones").update({ version: newVersion }).eq("id", id);
@@ -228,20 +237,18 @@ export default function DetalleCotizacion() {
           <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
             <Copy className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Versión</span><span className="sm:hidden">Versión</span>
           </Button>
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
+            <Pencil className="h-4 w-4" /> Editar
+          </Button>
           {isAdmin && (
-            <>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
-                <Pencil className="h-4 w-4" /> Editar
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
-                onClick={() => setShowDeleteModal(true)}
-              >
-                <Trash2 className="h-4 w-4" /> Eliminar
-              </Button>
-            </>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+              onClick={() => setShowDeleteModal(true)}
+            >
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </Button>
           )}
           <Badge variant="outline" className={statusColors[quote.status]}>
             {quote.status}
@@ -265,6 +272,9 @@ export default function DetalleCotizacion() {
             <div className="flex justify-between"><span className="text-muted-foreground">N° Requerimiento</span><span className="text-foreground">{quote.requirement || "-"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Ejecutivo</span><span className="text-foreground">{quote.executive}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Moneda</span><span className="text-foreground">{quote.currency}</span></div>
+            {quote.uf_value != null && (
+              <div className="flex justify-between"><span className="text-muted-foreground">Valor UF</span><span className="text-foreground">${quote.uf_value.toLocaleString("es-CL")} CLP</span></div>
+            )}
             <div className="flex justify-between"><span className="text-muted-foreground">Fecha</span><span className="text-foreground">{new Date(quote.created_at).toLocaleDateString("es-CL")}</span></div>
           </div>
         </div>
@@ -288,9 +298,12 @@ export default function DetalleCotizacion() {
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  {v.uf_value != null && (
+                    <span className="text-xs text-muted-foreground">UF ${v.uf_value.toLocaleString("es-CL")}</span>
+                  )}
                   {v.total != null && (
                     <span className="text-sm font-semibold text-foreground">
-                      {v.currency ?? ""} ${v.total.toLocaleString("es-CL")}
+                      ${v.total.toLocaleString("es-CL")}
                     </span>
                   )}
                   <Badge

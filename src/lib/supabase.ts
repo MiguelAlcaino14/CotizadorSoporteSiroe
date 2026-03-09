@@ -23,6 +23,7 @@ export type Cotizacion = {
   status: string;
   requirement: string;
   version: number;
+  uf_value: number | null;
   created_at: string;
   updated_at: string;
   clientes?: Cliente;
@@ -50,6 +51,7 @@ export type CotizacionVersion = {
   currency: string | null;
   executive: string | null;
   requirement: string | null;
+  uf_value: number | null;
 };
 
 export type Ticket = {
