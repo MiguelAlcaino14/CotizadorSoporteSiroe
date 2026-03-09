@@ -419,11 +419,11 @@ export default function DetalleCotizacion() {
                 )}
                 <Badge variant="outline" className="text-xs">{d.type}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("es-CL")}</span>
-                {isAdmin && d.type === "Aprobación" && (
+                {isAdmin && (
                   <button
                     onClick={() => handleDeleteDocumento(d.id)}
                     className="ml-1 text-destructive hover:text-destructive/80 transition-colors"
-                    title="Eliminar aprobación"
+                    title="Eliminar documento"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
