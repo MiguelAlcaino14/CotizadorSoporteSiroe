@@ -354,8 +354,13 @@ export default function DetalleCotizacion() {
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <div className="p-5 border-b">
+        <div className="p-5 border-b flex items-center justify-between flex-wrap gap-2">
           <h2 className="font-semibold text-foreground">Servicios / Productos</h2>
+          {ufValue > 0 && items.some((i) => i.currency === "UF") && (
+            <span className="text-xs text-muted-foreground bg-warning/10 border border-warning/20 rounded px-2 py-1">
+              Valor UF utilizado: <span className="font-semibold text-foreground">${ufValue.toLocaleString("es-CL")} CLP</span>
+            </span>
+          )}
         </div>
         <div className="overflow-x-auto">
         <table className="w-full min-w-[480px]">
@@ -370,16 +375,33 @@ export default function DetalleCotizacion() {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-5 py-3 text-sm font-medium text-foreground">{item.service}</td>
-                <td className="px-5 py-3 text-sm text-muted-foreground">{item.description}</td>
-                <td className="px-5 py-3 text-sm text-right text-foreground">{item.quantity}</td>
-                <td className="px-5 py-3 text-sm text-right text-foreground">{item.currency ?? "CLP"}</td>
-                <td className="px-5 py-3 text-sm text-right text-foreground">{item.currency === "UF" ? `UF ${item.unit_price.toLocaleString("es-CL")}` : `$${item.unit_price.toLocaleString("es-CL")}`}</td>
-                <td className="px-5 py-3 text-sm text-right font-medium text-foreground">{item.currency === "UF" ? `UF ${(item.quantity * item.unit_price).toLocaleString("es-CL")}` : `$${(item.quantity * item.unit_price).toLocaleString("es-CL")}`}</td>
-              </tr>
-            ))}
+            {items.map((item) => {
+              const lineUF = item.quantity * item.unit_price;
+              const lineCLP = item.currency === "UF" ? lineUF * ufValue : lineUF;
+              return (
+                <tr key={item.id}>
+                  <td className="px-5 py-3 text-sm font-medium text-foreground">{item.service}</td>
+                  <td className="px-5 py-3 text-sm text-muted-foreground">{item.description}</td>
+                  <td className="px-5 py-3 text-sm text-right text-foreground">{item.quantity}</td>
+                  <td className="px-5 py-3 text-sm text-right text-foreground">{item.currency ?? "CLP"}</td>
+                  <td className="px-5 py-3 text-sm text-right text-foreground">
+                    {item.currency === "UF" ? `UF ${item.unit_price.toLocaleString("es-CL")}` : `$${item.unit_price.toLocaleString("es-CL")}`}
+                  </td>
+                  <td className="px-5 py-3 text-sm text-right font-medium text-foreground">
+                    {item.currency === "UF" ? (
+                      <span className="flex flex-col items-end gap-0.5">
+                        <span>UF {lineUF.toLocaleString("es-CL")}</span>
+                        {ufValue > 0 && (
+                          <span className="text-xs text-muted-foreground">${Math.round(lineCLP).toLocaleString("es-CL")}</span>
+                        )}
+                      </span>
+                    ) : (
+                      `$${Math.round(lineCLP).toLocaleString("es-CL")}`
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t bg-muted/20">

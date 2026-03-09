@@ -1,4 +1,5 @@
-import { Plus, Trash2 } from "lucide-react";
+import React from "react";
+import { Plus, Trash2, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ interface Props {
   ufValue: number;
   onUfValueChange: (v: number) => void;
   onItemsChange: (items: LineItem[]) => void;
+  onSaveUfValue?: (v: number) => Promise<void>;
 }
 
 function itemTotalCLP(item: LineItem, ufValue: number): number {
@@ -34,7 +36,8 @@ function itemTotalCLP(item: LineItem, ufValue: number): number {
 
 const IVA = 0.19;
 
-export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange, onItemsChange }: Props) {
+export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange, onItemsChange, onSaveUfValue }: Props) {
+  const [savingUf, setSavingUf] = React.useState(false);
   const hasUFItems = items.some((i) => i.currency === "UF");
 
   const netTotal = items.reduce((sum, i) => sum + itemTotalCLP(i, ufValue), 0);
@@ -81,7 +84,7 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
       </div>
 
       {hasUFItems && (
-        <div className="flex items-end gap-3 p-3 rounded-lg bg-warning/5 border border-warning/20">
+        <div className="flex items-end gap-3 p-3 rounded-lg bg-warning/5 border border-warning/20 flex-wrap">
           <div className="space-y-1.5 w-48">
             <Label className="text-xs">Valor UF (en CLP)</Label>
             <Input
@@ -93,6 +96,23 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
               onChange={(e) => onUfValueChange(parseFloat(e.target.value) || 0)}
             />
           </div>
+          {onSaveUfValue && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9"
+              disabled={savingUf || ufValue <= 0}
+              onClick={async () => {
+                setSavingUf(true);
+                await onSaveUfValue(ufValue);
+                setSavingUf(false);
+              }}
+            >
+              <Save className="h-3.5 w-3.5" />
+              {savingUf ? "Guardando..." : "Guardar precio UF"}
+            </Button>
+          )}
           <p className="text-xs text-muted-foreground pb-1">
             Necesario para calcular el total de ítems en UF
           </p>

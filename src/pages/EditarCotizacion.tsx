@@ -238,6 +238,17 @@ export default function EditarCotizacion() {
             ufValue={ufValue}
             onUfValueChange={setUfValue}
             onItemsChange={handleItemsChange}
+            onSaveUfValue={async (v) => {
+              const { error } = await supabase
+                .from("cotizaciones")
+                .update({ uf_value: v })
+                .eq("id", id);
+              if (error) {
+                toast.error("Error al guardar el valor UF");
+              } else {
+                toast.success(`Valor UF $${v.toLocaleString("es-CL")} guardado`);
+              }
+            }}
           />
         </div>
 
