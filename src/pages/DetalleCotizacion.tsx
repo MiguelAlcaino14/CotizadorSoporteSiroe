@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +35,8 @@ type CotizacionFull = Cotizacion & {
 export default function DetalleCotizacion() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
   const [showOCModal, setShowOCModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -115,6 +118,13 @@ export default function DetalleCotizacion() {
     const { data } = await supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at");
     if (data) setDocumentos(data);
     toast.success("Factura subida correctamente");
+  };
+
+  const handleDeleteDocumento = async (docId: string) => {
+    const { error } = await supabase.from("documentos").delete().eq("id", docId);
+    if (error) { toast.error("Error al eliminar documento"); return; }
+    setDocumentos((prev) => prev.filter((d) => d.id !== docId));
+    toast.success("Documento eliminado");
   };
 
   const handleNuevaVersion = async () => {
@@ -357,12 +367,26 @@ export default function DetalleCotizacion() {
                 <span className="text-foreground">{d.name}</span>
                 <Badge variant="outline" className="text-xs">{d.type}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("es-CL")}</span>
+                {isAdmin && d.type === "Aprobación" && (
+                  <button
+                    onClick={() => handleDeleteDocumento(d.id)}
+                    className="ml-1 text-destructive hover:text-destructive/80 transition-colors"
+                    title="Eliminar aprobación"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
         )}
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" className="gap-2" onClick={handleApprovalUpload}>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleApprovalUpload}
+            disabled={documentos.some((d) => d.type === "Aprobación")}
+          >
             <Upload className="h-4 w-4" /> Adjuntar Aprobación
           </Button>
           {hasOC === true && (
