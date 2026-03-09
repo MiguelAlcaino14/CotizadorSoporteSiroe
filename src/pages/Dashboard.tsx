@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FileText, CheckCircle, Clock, Receipt, ArrowRight } from "lucide-react";
+import { FileText, CircleCheck as CheckCircle, Clock, Receipt, ArrowRight } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
