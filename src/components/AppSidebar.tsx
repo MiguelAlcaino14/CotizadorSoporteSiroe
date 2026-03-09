@@ -41,7 +41,7 @@ export function AppSidebar() {
             <img
               src="/Logo_Siroe_opc_2_B.png"
               alt="Siroe"
-              className="w-3/4 h-auto object-contain mx-auto"
+              className="w-36 h-auto object-contain mx-2"
             />
           )}
         </div>
