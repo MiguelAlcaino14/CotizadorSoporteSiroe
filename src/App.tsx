@@ -30,9 +30,9 @@ const App = () => (
             <Route path="/" element={<Dashboard />} />
             <Route path="/cotizaciones" element={<Cotizaciones />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
+            <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
             <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/cotizaciones" />}>
               <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
-              <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
               <Route path="/configuracion" element={<Configuracion />} />
             </Route>
           </Route>
