@@ -45,6 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         (async () => {
           await fetchProfile(session.user.id);
+          if (event === "SIGNED_IN") {
+            await supabase.from("login_logs").insert({
+              user_id: session.user.id,
+              email: session.user.email ?? "",
+            });
+          }
         })();
       } else {
         setProfile(null);
