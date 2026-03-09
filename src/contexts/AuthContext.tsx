@@ -45,12 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         (async () => {
           await fetchProfile(session.user.id);
-          if (event === "SIGNED_IN") {
-            await supabase.from("login_logs").insert({
-              user_id: session.user.id,
-              email: session.user.email ?? "",
-            });
-          }
         })();
       } else {
         setProfile(null);
@@ -61,8 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
+    if (data.user) {
+      await supabase.from("login_logs").insert({
+        user_id: data.user.id,
+        email: data.user.email ?? "",
+      });
+    }
     return { error: null };
   }
 
