@@ -154,7 +154,7 @@ export default function EditarCotizacion() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate(`/cotizaciones/${id}`)}>
           <ArrowLeft className="h-5 w-5" />

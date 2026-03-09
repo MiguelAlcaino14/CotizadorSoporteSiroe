@@ -79,19 +79,19 @@ export default function Cotizaciones() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-header">Cotizaciones</h1>
           <p className="page-subheader">Gestiona todas las cotizaciones del sistema</p>
         </div>
-        <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2">
+        <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2 self-start sm:self-auto shrink-0">
           <Plus className="h-4 w-4" />
           Nueva Cotización
         </Button>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por N° o cliente..."
@@ -101,7 +101,7 @@ export default function Cotizaciones() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
@@ -117,71 +117,73 @@ export default function Cotizaciones() {
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b bg-muted/30">
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">N° Cotización</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cliente</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Ejecutivo</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Moneda</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Versión</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Fecha</th>
-              <th className="px-5 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
-              <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-sm text-muted-foreground">Cargando...</td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[580px]">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">N° Cotización</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cliente</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Ejecutivo</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Moneda</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Versión</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Fecha</th>
+                <th className="px-4 py-3"></th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-sm text-muted-foreground">No se encontraron cotizaciones.</td>
-              </tr>
-            ) : (
-              filtered.map((q) => (
-                <tr
-                  key={q.id}
-                  className="hover:bg-muted/20 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/cotizaciones/${q.id}`)}
-                >
-                  <td className="px-5 py-3 font-mono text-sm font-medium text-primary">{q.id}</td>
-                  <td className="px-5 py-3 text-sm text-foreground">{q.clientes?.name ?? "-"}</td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">{q.executive}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-foreground">{q.currency}</td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">v{q.version}</td>
-                  <td className="px-5 py-3">
-                    <Badge variant="outline" className={statusColors[q.status]}>{q.status}</Badge>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">
-                    {new Date(q.created_at).toLocaleDateString("es-CL")}
-                  </td>
-                  <td className="px-5 py-3" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => navigate(`/cotizaciones/${q.id}/editar`)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(q)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+            </thead>
+            <tbody className="divide-y">
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-8 text-center text-sm text-muted-foreground">Cargando...</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-5 py-8 text-center text-sm text-muted-foreground">No se encontraron cotizaciones.</td>
+                </tr>
+              ) : (
+                filtered.map((q) => (
+                  <tr
+                    key={q.id}
+                    className="hover:bg-muted/20 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/cotizaciones/${q.id}`)}
+                  >
+                    <td className="px-4 py-3 font-mono text-sm font-medium text-primary whitespace-nowrap">{q.id}</td>
+                    <td className="px-4 py-3 text-sm text-foreground">{q.clientes?.name ?? "-"}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{q.executive}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-foreground hidden sm:table-cell">{q.currency}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">v{q.version}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="outline" className={statusColors[q.status]}>{q.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap hidden sm:table-cell">
+                      {new Date(q.created_at).toLocaleDateString("es-CL")}
+                    </td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/cotizaciones/${q.id}/editar`)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(q)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>

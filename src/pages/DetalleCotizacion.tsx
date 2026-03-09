@@ -184,8 +184,8 @@ export default function DetalleCotizacion() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/cotizaciones")}>
             <ArrowLeft className="h-5 w-5" />
@@ -197,9 +197,9 @@ export default function DetalleCotizacion() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 pl-12 sm:pl-0">
           <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
-            <Copy className="h-4 w-4" /> Nueva Versión
+            <Copy className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Versión</span><span className="sm:hidden">Versión</span>
           </Button>
           <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
             <Pencil className="h-4 w-4" /> Editar
@@ -276,7 +276,8 @@ export default function DetalleCotizacion() {
               </div>
               {v.items_snapshot && v.items_snapshot.length > 0 && (
                 <div className="rounded-lg border bg-muted/20 overflow-hidden">
-                  <table className="w-full text-sm">
+                  <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px] text-sm">
                     <thead>
                       <tr className="border-b bg-muted/30">
                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Servicio</th>
@@ -298,6 +299,7 @@ export default function DetalleCotizacion() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
             </div>
@@ -309,7 +311,8 @@ export default function DetalleCotizacion() {
         <div className="p-5 border-b">
           <h2 className="font-semibold text-foreground">Servicios / Productos</h2>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[480px]">
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Servicio</th>
@@ -337,6 +340,7 @@ export default function DetalleCotizacion() {
             </tr>
           </tfoot>
         </table>
+        </div>
       </div>
 
       <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">

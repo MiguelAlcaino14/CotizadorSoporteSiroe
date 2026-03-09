@@ -89,14 +89,14 @@ export default function Dashboard() {
         <p className="page-subheader">Resumen general del sistema de cotizaciones</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard title="Total Cotizaciones" value={stats.total} icon={FileText} variant="primary" trend="En el sistema" />
         <StatCard title="Aprobadas" value={stats.aprobadas} icon={CheckCircle} variant="success" trend={`${stats.total ? Math.round((stats.aprobadas / stats.total) * 100) : 0}% del total`} />
         <StatCard title="En Ejecución" value={stats.enEjecucion} icon={Clock} variant="info" />
         <StatCard title="Facturadas" value={stats.pendientesFacturacion} icon={Receipt} variant="warning" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <div className="lg:col-span-2 bg-card rounded-xl border shadow-sm">
           <div className="flex items-center justify-between p-5 border-b">
             <h2 className="font-semibold text-foreground">Cotizaciones Recientes</h2>

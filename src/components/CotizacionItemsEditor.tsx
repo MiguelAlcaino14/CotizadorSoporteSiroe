@@ -100,7 +100,8 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
       )}
 
       <div className="rounded-lg border overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="bg-muted/30 border-b">
               <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -214,6 +215,7 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="border-t pt-4 space-y-1.5">
