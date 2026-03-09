@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase, type Cotizacion } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors: Record<string, string> = {
   Aprobada: "bg-success/10 text-success border-success/20",
@@ -34,6 +35,8 @@ type CotizacionWithCliente = Cotizacion & { clientes: { name: string } | null };
 
 export default function Cotizaciones() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [quotes, setQuotes] = useState<CotizacionWithCliente[]>([]);
@@ -84,10 +87,12 @@ export default function Cotizaciones() {
           <h1 className="page-header">Cotizaciones</h1>
           <p className="page-subheader">Gestiona todas las cotizaciones del sistema</p>
         </div>
-        <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2 self-start sm:self-auto shrink-0">
-          <Plus className="h-4 w-4" />
-          Nueva Cotización
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2 self-start sm:self-auto shrink-0">
+            <Plus className="h-4 w-4" />
+            Nueva Cotización
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -128,7 +133,7 @@ export default function Cotizaciones() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Versión</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Fecha</th>
-                <th className="px-4 py-3"></th>
+                {isAdmin && <th className="px-4 py-3"></th>}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -158,26 +163,28 @@ export default function Cotizaciones() {
                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap hidden sm:table-cell">
                       {new Date(q.created_at).toLocaleDateString("es-CL")}
                     </td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => navigate(`/cotizaciones/${q.id}/editar`)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(q)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => navigate(`/cotizaciones/${q.id}/editar`)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(q)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

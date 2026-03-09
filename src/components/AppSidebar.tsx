@@ -21,10 +21,10 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 
-const items = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Cotizaciones", url: "/cotizaciones", icon: FileText },
-  { title: "Configuración", url: "/configuracion", icon: Settings },
+const allItems = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, adminOnly: false },
+  { title: "Cotizaciones", url: "/cotizaciones", icon: FileText, adminOnly: false },
+  { title: "Configuración", url: "/configuracion", icon: Settings, adminOnly: true },
 ];
 
 export function AppSidebar() {
@@ -32,6 +32,8 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const items = allItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <Sidebar collapsible="icon">

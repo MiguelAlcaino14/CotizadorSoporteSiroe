@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RoleRoute } from "@/components/RoleRoute";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Cotizaciones from "./pages/Cotizaciones";
@@ -28,10 +29,12 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/cotizaciones" element={<Cotizaciones />} />
-            <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
-            <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
-            <Route path="/configuracion" element={<Configuracion />} />
+            <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/cotizaciones" />}>
+              <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
+              <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
+              <Route path="/configuracion" element={<Configuracion />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

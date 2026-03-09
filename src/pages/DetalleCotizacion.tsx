@@ -225,20 +225,24 @@ export default function DetalleCotizacion() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 pl-12 sm:pl-0">
-          <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
-            <Copy className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Versión</span><span className="sm:hidden">Versión</span>
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
-            onClick={() => setShowDeleteModal(true)}
-          >
-            <Trash2 className="h-4 w-4" /> Eliminar
-          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
+                <Copy className="h-4 w-4" /> <span className="hidden sm:inline">Nueva Versión</span><span className="sm:hidden">Versión</span>
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => navigate(`/cotizaciones/${id}/editar`)}>
+                <Pencil className="h-4 w-4" /> Editar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                onClick={() => setShowDeleteModal(true)}
+              >
+                <Trash2 className="h-4 w-4" /> Eliminar
+              </Button>
+            </>
+          )}
           <Badge variant="outline" className={statusColors[quote.status]}>
             {quote.status}
           </Badge>
