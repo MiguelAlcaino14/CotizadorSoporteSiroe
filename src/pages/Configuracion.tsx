@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -138,12 +137,6 @@ export default function Configuracion() {
     }
   };
 
-  const roleLabel: Record<string, string> = { admin: "Admin", comercial: "Comercial" };
-  const roleColors: Record<string, string> = {
-    admin: "bg-primary/10 text-primary border-primary/20",
-    comercial: "bg-muted text-muted-foreground border-border",
-  };
-
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
@@ -231,36 +224,28 @@ export default function Configuracion() {
                     <TableCell className="font-medium">{p.full_name || "-"}</TableCell>
                     <TableCell className="text-muted-foreground">{p.email}</TableCell>
                     <TableCell>
-                      {false ? (
-                        <Badge variant="outline" className={roleColors[p.role]}>
-                          {roleLabel[p.role]}
-                        </Badge>
-                      ) : (
-                        <Select
-                          value={p.role}
-                          onValueChange={(val) => handleChangeRole(p.id, val as "admin" | "comercial")}
-                        >
-                          <SelectTrigger className="h-7 w-28 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="comercial">Comercial</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
+                      <Select
+                        value={p.role}
+                        onValueChange={(val) => handleChangeRole(p.id, val as "admin" | "comercial")}
+                      >
+                        <SelectTrigger className="h-7 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="comercial">Comercial</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
-                      {true && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteUser(p.id, p.email)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteUser(p.id, p.email)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}

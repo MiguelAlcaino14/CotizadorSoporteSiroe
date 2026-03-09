@@ -93,11 +93,17 @@ export type AppConfig = {
 };
 
 export async function getAppConfigs(keys: string[]): Promise<Record<string, string[]>> {
-  const { data, error } = await (supabase as ReturnType<typeof createClient>)
-    .from("app_config")
-    .select("key, values")
-    .in("key", keys);
-  if (error || !data) return {};
-  const rows = data as { key: string; values: string[] }[];
-  return Object.fromEntries(rows.map((r) => [r.key, r.values]));
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? supabaseAnonKey;
+  const keysParam = keys.map((k) => `"${k}"`).join(",");
+  const url = `${supabaseUrl}/rest/v1/app_config?key=in.(${keysParam})&select=key,values`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) return {};
+  const rows: { key: string; values: string[] }[] = await res.json();
+  return Object.fromEntries(rows.map((r) => [r.key, Array.isArray(r.values) ? r.values : []]));
 }
