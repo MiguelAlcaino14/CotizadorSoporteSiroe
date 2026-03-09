@@ -239,7 +239,7 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
         </div>
         {hasUFItems && ufValue > 0 && (
           <p className="text-right text-xs text-muted-foreground">
-            UF utilizada: ${ufValue.toLocaleString("es-CL")} CLP
+            Valor de UF utilizada: ${ufValue.toLocaleString("es-CL")} CLP
           </p>
         )}
       </div>
