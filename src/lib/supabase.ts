@@ -91,3 +91,13 @@ export type AppConfig = {
   values: string[];
   updated_at: string;
 };
+
+export async function getAppConfigs(keys: string[]): Promise<Record<string, string[]>> {
+  const { data, error } = await (supabase as ReturnType<typeof createClient>)
+    .from("app_config")
+    .select("key, values")
+    .in("key", keys);
+  if (error || !data) return {};
+  const rows = data as { key: string; values: string[] }[];
+  return Object.fromEntries(rows.map((r) => [r.key, r.values]));
+}

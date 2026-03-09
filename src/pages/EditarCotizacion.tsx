@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { supabase, type Cliente, type CotizacionItem, type AppConfig } from "@/lib/supabase";
+import { supabase, getAppConfigs, type Cliente, type CotizacionItem } from "@/lib/supabase";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 
 export default function EditarCotizacion() {
@@ -35,19 +35,14 @@ export default function EditarCotizacion() {
   useEffect(() => {
     if (!id) return;
     async function load() {
-      const [cotRes, itemsRes, clientesRes, configRes] = await Promise.all([
+      const [cotRes, itemsRes, clientesRes, configs] = await Promise.all([
         supabase.from("cotizaciones").select("*").eq("id", id).maybeSingle(),
         supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
         supabase.from("clientes").select("*").order("name"),
-        supabase.from("app_config" as never).select("key, values").in("key", ["executives", "statuses"]),
+        getAppConfigs(["executives", "statuses"]),
       ]);
-      if (configRes.data) {
-        const configs = configRes.data as AppConfig[];
-        const execConfig = configs.find((c) => c.key === "executives");
-        const statusConfig = configs.find((c) => c.key === "statuses");
-        setExecutives(execConfig?.values ?? []);
-        setStatuses(statusConfig?.values ?? []);
-      }
+      setExecutives(configs["executives"] ?? []);
+      setStatuses(configs["statuses"] ?? []);
       if (cotRes.data) {
         setClientId(cotRes.data.client_id);
         setExecutive(cotRes.data.executive);
