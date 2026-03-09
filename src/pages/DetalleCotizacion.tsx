@@ -391,8 +391,10 @@ export default function DetalleCotizacion() {
                     {item.currency === "UF" ? (
                       <span className="flex flex-col items-end gap-0.5">
                         <span>UF {lineUF.toLocaleString("es-CL")}</span>
-                        {ufValue > 0 && (
-                          <span className="text-xs text-muted-foreground">${Math.round(lineCLP).toLocaleString("es-CL")}</span>
+                        {ufValue > 0 ? (
+                          <span className="text-xs text-muted-foreground">${Math.round(lineCLP).toLocaleString("es-CL")} CLP</span>
+                        ) : (
+                          <span className="text-xs text-warning">Sin valor UF</span>
                         )}
                       </span>
                     ) : (
@@ -405,7 +407,14 @@ export default function DetalleCotizacion() {
           </tbody>
           <tfoot>
             <tr className="border-t bg-muted/20">
-              <td colSpan={5} className="px-5 py-3 text-sm font-semibold text-right text-foreground">Total</td>
+              <td colSpan={5} className="px-5 py-3 text-sm font-semibold text-right text-foreground">
+                {items.some((i) => i.currency === "UF") && ufValue <= 0 ? (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span>Total</span>
+                    <span className="text-xs font-normal text-warning">Incluye ítems UF sin convertir</span>
+                  </span>
+                ) : "Total"}
+              </td>
               <td className="px-5 py-3 text-lg font-bold text-right text-primary">${total.toLocaleString("es-CL")}</td>
             </tr>
           </tfoot>

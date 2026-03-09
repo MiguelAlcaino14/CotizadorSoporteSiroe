@@ -259,7 +259,12 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
         </div>
         {hasUFItems && ufValue > 0 && (
           <p className="text-right text-xs text-muted-foreground">
-            Valor de UF utilizada: ${ufValue.toLocaleString("es-CL")} CLP
+            Valor UF utilizado: ${ufValue.toLocaleString("es-CL")} CLP
+          </p>
+        )}
+        {hasUFItems && ufValue <= 0 && (
+          <p className="text-right text-xs text-warning">
+            Ingresa el valor UF para calcular el total correctamente
           </p>
         )}
       </div>
