@@ -29,7 +29,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-8">
         <div className="flex flex-col items-center gap-4">
-          <img src="/Logo_Siroe_opc_2_B.png" alt="Siroe" className="w-48 h-auto" />
+          <img src="/Logo_Siroe_opc_3_B.png" alt="Siroe" className="w-48 h-auto" />
           <div className="text-center">
             <h1 className="text-2xl font-semibold text-foreground">Iniciar sesión</h1>
             <p className="text-sm text-muted-foreground mt-1">Ingresa tus credenciales para continuar</p>
