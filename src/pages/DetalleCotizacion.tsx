@@ -283,6 +283,7 @@ export default function DetalleCotizacion() {
                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Servicio</th>
                         <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Descripción</th>
                         <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Cant.</th>
+                        <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Moneda</th>
                         <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Valor Unit.</th>
                         <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase">Total</th>
                       </tr>
@@ -293,8 +294,9 @@ export default function DetalleCotizacion() {
                           <td className="px-4 py-2 font-medium text-foreground">{item.service}</td>
                           <td className="px-4 py-2 text-muted-foreground">{item.description}</td>
                           <td className="px-4 py-2 text-right text-foreground">{item.quantity}</td>
-                          <td className="px-4 py-2 text-right text-foreground">${item.unit_price.toLocaleString("es-CL")}</td>
-                          <td className="px-4 py-2 text-right font-medium text-foreground">${(item.quantity * item.unit_price).toLocaleString("es-CL")}</td>
+                          <td className="px-4 py-2 text-right text-foreground">{item.currency ?? "CLP"}</td>
+                          <td className="px-4 py-2 text-right text-foreground">{item.currency === "UF" ? `UF ${item.unit_price.toLocaleString("es-CL")}` : `$${item.unit_price.toLocaleString("es-CL")}`}</td>
+                          <td className="px-4 py-2 text-right font-medium text-foreground">{item.currency === "UF" ? `UF ${(item.quantity * item.unit_price).toLocaleString("es-CL")}` : `$${(item.quantity * item.unit_price).toLocaleString("es-CL")}`}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -318,6 +320,7 @@ export default function DetalleCotizacion() {
               <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Servicio</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Descripción</th>
               <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Cant.</th>
+              <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Moneda</th>
               <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Valor Unit.</th>
               <th className="text-right px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Total</th>
             </tr>
@@ -328,14 +331,15 @@ export default function DetalleCotizacion() {
                 <td className="px-5 py-3 text-sm font-medium text-foreground">{item.service}</td>
                 <td className="px-5 py-3 text-sm text-muted-foreground">{item.description}</td>
                 <td className="px-5 py-3 text-sm text-right text-foreground">{item.quantity}</td>
-                <td className="px-5 py-3 text-sm text-right text-foreground">${item.unit_price.toLocaleString("es-CL")}</td>
-                <td className="px-5 py-3 text-sm text-right font-medium text-foreground">${(item.quantity * item.unit_price).toLocaleString("es-CL")}</td>
+                <td className="px-5 py-3 text-sm text-right text-foreground">{item.currency ?? "CLP"}</td>
+                <td className="px-5 py-3 text-sm text-right text-foreground">{item.currency === "UF" ? `UF ${item.unit_price.toLocaleString("es-CL")}` : `$${item.unit_price.toLocaleString("es-CL")}`}</td>
+                <td className="px-5 py-3 text-sm text-right font-medium text-foreground">{item.currency === "UF" ? `UF ${(item.quantity * item.unit_price).toLocaleString("es-CL")}` : `$${(item.quantity * item.unit_price).toLocaleString("es-CL")}`}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t bg-muted/20">
-              <td colSpan={4} className="px-5 py-3 text-sm font-semibold text-right text-foreground">Total</td>
+              <td colSpan={5} className="px-5 py-3 text-sm font-semibold text-right text-foreground">Total</td>
               <td className="px-5 py-3 text-lg font-bold text-right text-primary">${total.toLocaleString("es-CL")}</td>
             </tr>
           </tfoot>
