@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2, X } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,6 +46,10 @@ export default function DetalleCotizacion() {
   const [versions, setVersions] = useState<CotizacionVersion[]>([]);
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const approvalInputRef = useRef<HTMLInputElement>(null);
+  const facturaInputRef = useRef<HTMLInputElement>(null);
+  const ocInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -67,57 +71,70 @@ export default function DetalleCotizacion() {
 
   const total = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
 
-  const handleApprovalUpload = async () => {
+  const uploadFile = async (file: File, type: string, prefix: string) => {
     if (!id) return;
-    const { error } = await supabase.from("documentos").insert({
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const storagePath = `${id}/${prefix}_${Date.now()}.${ext}`;
+    const { error: storageError } = await supabase.storage
+      .from("documentos")
+      .upload(storagePath, file, { upsert: false });
+    if (storageError) {
+      toast.error(`Error al subir el archivo: ${storageError.message}`);
+      setUploading(false);
+      return null;
+    }
+    const { data: urlData } = supabase.storage.from("documentos").getPublicUrl(storagePath);
+    const { error: dbError } = await supabase.from("documentos").insert({
       cotizacion_id: id,
-      name: `Aprobación ${id}.pdf`,
-      type: "Aprobación",
+      name: file.name,
+      type,
+      url: urlData.publicUrl,
     });
-    if (error) {
-      toast.error("Error al adjuntar aprobación");
-      return;
+    if (dbError) {
+      toast.error("Error al registrar el documento");
+      setUploading(false);
+      return null;
     }
     const { data } = await supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at");
     if (data) setDocumentos(data);
-    toast.success("Documento de aprobación adjuntado");
-    setShowOCModal(true);
+    setUploading(false);
+    return urlData.publicUrl;
+  };
+
+  const handleApprovalFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const url = await uploadFile(file, "Aprobación", "Aprobacion");
+    if (url) {
+      toast.success("Aprobación adjuntada correctamente");
+      setShowOCModal(true);
+    }
+  };
+
+  const handleFacturaFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const url = await uploadFile(file, "Factura", "Factura");
+    if (url) toast.success("Factura subida correctamente");
+  };
+
+  const handleOCFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const url = await uploadFile(file, "Orden de Compra", "OC");
+    if (url) toast.success("Orden de Compra subida correctamente");
   };
 
   const handleOCResponse = async (value: boolean) => {
     setHasOC(value);
     setShowOCModal(false);
     if (value) {
-      toast.info("Por favor suba la Orden de Compra");
-    } else {
-      toast.success("Se notificará a facturación para generar la factura");
+      setTimeout(() => ocInputRef.current?.click(), 100);
     }
-  };
-
-  const handleUploadOC = async () => {
-    if (!id) return;
-    const { error } = await supabase.from("documentos").insert({
-      cotizacion_id: id,
-      name: `OC_${id}_${new Date().getFullYear()}.pdf`,
-      type: "Orden de Compra",
-    });
-    if (error) { toast.error("Error al subir OC"); return; }
-    const { data } = await supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at");
-    if (data) setDocumentos(data);
-    toast.success("OC subida correctamente");
-  };
-
-  const handleUploadFactura = async () => {
-    if (!id) return;
-    const { error } = await supabase.from("documentos").insert({
-      cotizacion_id: id,
-      name: `Factura_${id}.pdf`,
-      type: "Factura",
-    });
-    if (error) { toast.error("Error al subir factura"); return; }
-    const { data } = await supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at");
-    if (data) setDocumentos(data);
-    toast.success("Factura subida correctamente");
   };
 
   const handleDeleteDocumento = async (docId: string) => {
@@ -359,12 +376,47 @@ export default function DetalleCotizacion() {
 
       <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
         <h2 className="font-semibold text-foreground">Documentos y Acciones</h2>
+
+        <input
+          ref={approvalInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          onChange={handleApprovalFileSelected}
+        />
+        <input
+          ref={facturaInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          onChange={handleFacturaFileSelected}
+        />
+        <input
+          ref={ocInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp"
+          onChange={handleOCFileSelected}
+        />
+
         {documentos.length > 0 && (
           <div className="space-y-2 mb-2">
             {documentos.map((d) => (
               <div key={d.id} className="flex items-center gap-2 text-sm">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-foreground">{d.name}</span>
+                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                {d.url ? (
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-foreground hover:underline flex items-center gap-1"
+                  >
+                    {d.name}
+                    <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                  </a>
+                ) : (
+                  <span className="text-foreground">{d.name}</span>
+                )}
                 <Badge variant="outline" className="text-xs">{d.type}</Badge>
                 <span className="text-xs text-muted-foreground">{new Date(d.created_at).toLocaleDateString("es-CL")}</span>
                 {isAdmin && d.type === "Aprobación" && (
@@ -384,18 +436,30 @@ export default function DetalleCotizacion() {
           <Button
             variant="outline"
             className="gap-2"
-            onClick={handleApprovalUpload}
-            disabled={documentos.some((d) => d.type === "Aprobación")}
+            onClick={() => approvalInputRef.current?.click()}
+            disabled={uploading || documentos.some((d) => d.type === "Aprobación")}
           >
-            <Upload className="h-4 w-4" /> Adjuntar Aprobación
+            <Upload className="h-4 w-4" />
+            {uploading ? "Subiendo..." : "Adjuntar Aprobación"}
           </Button>
           {hasOC === true && (
-            <Button variant="outline" className="gap-2" onClick={handleUploadOC}>
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => ocInputRef.current?.click()}
+              disabled={uploading}
+            >
               <Upload className="h-4 w-4" /> Subir Orden de Compra
             </Button>
           )}
-          <Button variant="outline" className="gap-2" onClick={handleUploadFactura}>
-            <FileText className="h-4 w-4" /> Subir Factura
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => facturaInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <FileText className="h-4 w-4" />
+            {uploading ? "Subiendo..." : "Subir Factura"}
           </Button>
         </div>
       </div>

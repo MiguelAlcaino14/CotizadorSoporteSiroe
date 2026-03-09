@@ -40,10 +40,11 @@ function itemTotalCLP(item: LineItem, ufValue: number): number {
 
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
-  const [executive, setExecutive] = useState("Juan Pérez");
+  const [executive, setExecutive] = useState("");
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [executives, setExecutives] = useState<string[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -66,15 +67,22 @@ export default function NuevaCotizacion() {
   }, []);
 
   async function loadData() {
-    const [clientesRes, cotizacionesRes] = await Promise.all([
+    const [clientesRes, cotizacionesRes, configRes] = await Promise.all([
       supabase.from("clientes").select("*").order("name"),
       supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
+      supabase.from("app_config").select("key, values").in("key", ["executives"]),
     ]);
     if (clientesRes.data) setClientes(clientesRes.data);
     if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
       const lastId = cotizacionesRes.data[0].id;
       const num = parseInt(lastId.replace("COT-", ""), 10);
       setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
+    }
+    if (configRes.data) {
+      const execConfig = configRes.data.find((c) => c.key === "executives");
+      const execList: string[] = execConfig?.values ?? [];
+      setExecutives(execList);
+      if (execList.length > 0) setExecutive(execList[0]);
     }
   }
 
@@ -268,8 +276,9 @@ export default function NuevaCotizacion() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Juan Pérez">Juan Pérez</SelectItem>
-                  <SelectItem value="María García">María García</SelectItem>
+                  {executives.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

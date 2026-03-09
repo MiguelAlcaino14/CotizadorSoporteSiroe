@@ -28,10 +28,12 @@ import {
 } from "@/components/ui/table";
 import { toast } from "sonner";
 import { supabase, type Profile } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 import { UserPlus, Trash2 } from "lucide-react";
 
 export default function Configuracion() {
-  const isAdmin = true;
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
 
   const [form, setForm] = useState({ company_name: "Mi Empresa TI SpA", company_rut: "76.000.000-0", tickets_url: "" });
   const [saving, setSaving] = useState(false);

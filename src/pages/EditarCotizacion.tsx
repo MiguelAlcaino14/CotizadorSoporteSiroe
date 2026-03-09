@@ -24,6 +24,8 @@ export default function EditarCotizacion() {
   const [clientId, setClientId] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [executive, setExecutive] = useState("");
+  const [executives, setExecutives] = useState<string[]>([]);
+  const [statuses, setStatuses] = useState<string[]>([]);
   const [requirement, setRequirement] = useState("");
   const [status, setStatus] = useState("");
   const [ufValue, setUfValue] = useState<number>(0);
@@ -33,11 +35,18 @@ export default function EditarCotizacion() {
   useEffect(() => {
     if (!id) return;
     async function load() {
-      const [cotRes, itemsRes, clientesRes] = await Promise.all([
+      const [cotRes, itemsRes, clientesRes, configRes] = await Promise.all([
         supabase.from("cotizaciones").select("*").eq("id", id).maybeSingle(),
         supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
         supabase.from("clientes").select("*").order("name"),
+        supabase.from("app_config").select("key, values").in("key", ["executives", "statuses"]),
       ]);
+      if (configRes.data) {
+        const execConfig = configRes.data.find((c) => c.key === "executives");
+        const statusConfig = configRes.data.find((c) => c.key === "statuses");
+        setExecutives(execConfig?.values ?? []);
+        setStatuses(statusConfig?.values ?? []);
+      }
       if (cotRes.data) {
         setClientId(cotRes.data.client_id);
         setExecutive(cotRes.data.executive);
@@ -203,8 +212,9 @@ export default function EditarCotizacion() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Juan Pérez">Juan Pérez</SelectItem>
-                  <SelectItem value="María García">María García</SelectItem>
+                  {executives.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -215,11 +225,9 @@ export default function EditarCotizacion() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Borrador">Borrador</SelectItem>
-                  <SelectItem value="Pendiente">Pendiente</SelectItem>
-                  <SelectItem value="Aprobada">Aprobada</SelectItem>
-                  <SelectItem value="En ejecución">En ejecución</SelectItem>
-                  <SelectItem value="Facturada">Facturada</SelectItem>
+                  {statuses.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
