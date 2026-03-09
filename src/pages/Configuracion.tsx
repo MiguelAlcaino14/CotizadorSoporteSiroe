@@ -138,7 +138,7 @@ export default function Configuracion() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h1 className="page-header">Configuración</h1>
         <p className="page-subheader">Ajustes generales del sistema</p>
