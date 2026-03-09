@@ -19,7 +19,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, type Cliente } from "@/lib/supabase";
+import { supabase, type Cliente, type AppConfig } from "@/lib/supabase";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 
@@ -70,7 +70,7 @@ export default function NuevaCotizacion() {
     const [clientesRes, cotizacionesRes, configRes] = await Promise.all([
       supabase.from("clientes").select("*").order("name"),
       supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
-      supabase.from("app_config").select("key, values").in("key", ["executives"]),
+      supabase.from("app_config" as never).select("key, values").in("key", ["executives"]),
     ]);
     if (clientesRes.data) setClientes(clientesRes.data);
     if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
@@ -79,7 +79,8 @@ export default function NuevaCotizacion() {
       setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
     }
     if (configRes.data) {
-      const execConfig = configRes.data.find((c) => c.key === "executives");
+      const configs = configRes.data as AppConfig[];
+      const execConfig = configs.find((c) => c.key === "executives");
       const execList: string[] = execConfig?.values ?? [];
       setExecutives(execList);
       if (execList.length > 0) setExecutive(execList[0]);

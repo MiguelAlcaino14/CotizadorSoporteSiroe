@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { supabase, type Cliente, type CotizacionItem } from "@/lib/supabase";
+import { supabase, type Cliente, type CotizacionItem, type AppConfig } from "@/lib/supabase";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 
 export default function EditarCotizacion() {
@@ -39,11 +39,12 @@ export default function EditarCotizacion() {
         supabase.from("cotizaciones").select("*").eq("id", id).maybeSingle(),
         supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
         supabase.from("clientes").select("*").order("name"),
-        supabase.from("app_config").select("key, values").in("key", ["executives", "statuses"]),
+        supabase.from("app_config" as never).select("key, values").in("key", ["executives", "statuses"]),
       ]);
       if (configRes.data) {
-        const execConfig = configRes.data.find((c) => c.key === "executives");
-        const statusConfig = configRes.data.find((c) => c.key === "statuses");
+        const configs = configRes.data as AppConfig[];
+        const execConfig = configs.find((c) => c.key === "executives");
+        const statusConfig = configs.find((c) => c.key === "statuses");
         setExecutives(execConfig?.values ?? []);
         setStatuses(statusConfig?.values ?? []);
       }

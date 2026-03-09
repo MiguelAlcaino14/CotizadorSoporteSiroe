@@ -85,3 +85,9 @@ export type Profile = {
   full_name: string;
   created_at: string;
 };
+
+export type AppConfig = {
+  key: string;
+  values: string[];
+  updated_at: string;
+};
