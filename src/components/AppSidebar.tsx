@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   FileText,
-  Ticket,
   Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -20,7 +19,6 @@ import {
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Cotizaciones", url: "/cotizaciones", icon: FileText },
-  { title: "Tickets", url: "/tickets", icon: Ticket },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
