@@ -47,6 +47,7 @@ export default function NuevaCotizacion() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [executives, setExecutives] = useState<string[]>([]);
   const [nextId, setNextId] = useState("COT-001");
+  const [customId, setCustomId] = useState("");
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [ufValue, setUfValue] = useState<number>(0);
@@ -77,7 +78,11 @@ export default function NuevaCotizacion() {
     if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
       const lastId = cotizacionesRes.data[0].id;
       const num = parseInt(lastId.replace("COT-", ""), 10);
-      setNextId(`COT-${String(num + 1).padStart(3, "0")}`);
+      const generated = `COT-${String(num + 1).padStart(3, "0")}`;
+      setNextId(generated);
+      setCustomId(generated);
+    } else {
+      setCustomId("COT-001");
     }
     const execList: string[] = configs["executives"] ?? [];
     setExecutives(execList);
@@ -128,7 +133,7 @@ export default function NuevaCotizacion() {
     setGeneratingPDF(true);
     try {
       generateCotizacionPDF({
-        cotizacionId: nextId,
+        cotizacionId: customId.trim() || nextId,
         cliente: selectedCliente,
         executive,
         requirement,
@@ -138,7 +143,7 @@ export default function NuevaCotizacion() {
         ivaAmount,
         grandTotal,
       });
-      toast.success(`PDF ${nextId}.pdf descargado`);
+      toast.success(`PDF ${customId.trim() || nextId}.pdf descargado`);
     } catch {
       toast.error("Error al generar el PDF");
     } finally {
@@ -164,10 +169,11 @@ export default function NuevaCotizacion() {
       toast.error("Ingresa el valor de la UF");
       return;
     }
+    const finalId = customId.trim() || nextId;
     setSaving(true);
 
     const { error: cotError } = await supabase.from("cotizaciones").insert({
-      id: nextId,
+      id: finalId,
       client_id: clientId,
       executive,
       currency: hasUFItems ? "MIXTO" : "CLP",
@@ -185,7 +191,7 @@ export default function NuevaCotizacion() {
     }
 
     const itemsToInsert = items.map((i) => ({
-      cotizacion_id: nextId,
+      cotizacion_id: finalId,
       service: i.service,
       description: i.description,
       quantity: i.quantity,
@@ -201,7 +207,7 @@ export default function NuevaCotizacion() {
     }
 
     await supabase.from("cotizacion_versiones").insert({
-      cotizacion_id: nextId,
+      cotizacion_id: finalId,
       version: 1,
       status: "Vigente",
       items_snapshot: itemsToInsert.map((i) => ({ ...i, id: "", created_at: "" })),
@@ -213,7 +219,7 @@ export default function NuevaCotizacion() {
       uf_value: hasUFItems ? ufValue : null,
     });
 
-    toast.success(`Cotización ${nextId} creada exitosamente`);
+    toast.success(`Cotización ${finalId} creada exitosamente`);
     navigate("/cotizaciones");
   };
 
@@ -225,7 +231,7 @@ export default function NuevaCotizacion() {
         </Button>
         <div>
           <h1 className="page-header">Nueva Cotización</h1>
-          <p className="page-subheader">{nextId} • Borrador</p>
+          <p className="page-subheader">{customId.trim() || nextId} • Borrador</p>
         </div>
       </div>
 
@@ -270,7 +276,15 @@ export default function NuevaCotizacion() {
 
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-foreground">Información de la Cotización</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <Label>ID de Cotización</Label>
+              <Input
+                placeholder={nextId}
+                value={customId}
+                onChange={(e) => setCustomId(e.target.value)}
+              />
+            </div>
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
               <Input
