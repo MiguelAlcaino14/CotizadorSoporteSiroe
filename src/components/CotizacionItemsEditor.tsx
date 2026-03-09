@@ -189,10 +189,10 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
                   <td className="px-3 py-2 text-right font-medium text-foreground">
                     {item.currency === "UF" && ufValue > 0 ? (
                       <span className="text-xs text-muted-foreground">
-                        ${rowTotal.toLocaleString("es-CL")}
+                        ${Math.round(rowTotal).toLocaleString("es-CL")}
                       </span>
                     ) : item.currency === "CLP" ? (
-                      <span>${rowTotal.toLocaleString("es-CL")}</span>
+                      <span>${Math.round(rowTotal).toLocaleString("es-CL")}</span>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
@@ -220,19 +220,19 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
         <div className="flex justify-end gap-10 text-sm">
           <span className="text-muted-foreground">Neto</span>
           <span className="font-medium text-foreground w-36 text-right">
-            ${netTotal.toLocaleString("es-CL")}
+            ${Math.round(netTotal).toLocaleString("es-CL")}
           </span>
         </div>
         <div className="flex justify-end gap-10 text-sm">
           <span className="text-muted-foreground">IVA (19%)</span>
           <span className="font-medium text-foreground w-36 text-right">
-            ${ivaAmount.toLocaleString("es-CL")}
+            ${Math.round(ivaAmount).toLocaleString("es-CL")}
           </span>
         </div>
         <div className="flex justify-end gap-10 border-t pt-2">
           <span className="text-sm font-semibold text-foreground">Total c/IVA</span>
           <span className="text-xl font-bold text-foreground w-36 text-right">
-            ${grandTotal.toLocaleString("es-CL")}
+            ${Math.round(grandTotal).toLocaleString("es-CL")}
           </span>
         </div>
         {hasUFItems && ufValue > 0 && (
