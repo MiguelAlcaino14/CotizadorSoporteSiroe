@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Info, UserPlus, FileDown, Loader as Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, getAppConfigs, type Cliente } from "@/lib/supabase";
+import { supabase, type Cliente } from "@/lib/supabase";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 
@@ -40,12 +41,12 @@ function itemTotalCLP(item: LineItem, ufValue: number): number {
 
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [executive, setExecutive] = useState("");
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
   const [requesterName, setRequesterName] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [executives, setExecutives] = useState<string[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [customId, setCustomId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -68,11 +69,14 @@ export default function NuevaCotizacion() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (profile?.full_name) setExecutive(profile.full_name);
+  }, [profile]);
+
   async function loadData() {
-    const [clientesRes, cotizacionesRes, configs] = await Promise.all([
+    const [clientesRes, cotizacionesRes] = await Promise.all([
       supabase.from("clientes").select("*").order("name"),
       supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
-      getAppConfigs(["executives"]),
     ]);
     if (clientesRes.data) setClientes(clientesRes.data);
     if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
@@ -84,9 +88,6 @@ export default function NuevaCotizacion() {
     } else {
       setCustomId("COT-001");
     }
-    const execList: string[] = configs["executives"] ?? [];
-    setExecutives(execList);
-    if (execList.length > 0) setExecutive(execList[0]);
   }
 
   const hasUFItems = items.some((i) => i.currency === "UF");
@@ -295,16 +296,7 @@ export default function NuevaCotizacion() {
             </div>
             <div className="space-y-1.5">
               <Label>Ejecutivo responsable</Label>
-              <Select value={executive} onValueChange={setExecutive}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {executives.map((e) => (
-                    <SelectItem key={e} value={e}>{e}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input value={executive} readOnly className="bg-muted/40 cursor-default" />
             </div>
           </div>
         </div>
