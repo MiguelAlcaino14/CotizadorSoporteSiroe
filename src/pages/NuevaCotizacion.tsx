@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Info, UserPlus, FileDown, Loader as Loader2 } from "lucide-react";
+import { ArrowLeft, Info, UserPlus, FileDown, Loader as Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,17 +21,9 @@ import {
 import { toast } from "sonner";
 import { supabase, type Cliente } from "@/lib/supabase";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
+import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 
 const IVA = 0.19;
-
-interface LineItem {
-  id: number;
-  service: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  currency: "CLP" | "UF";
-}
 
 interface NuevoClienteForm {
   name: string;
@@ -86,25 +78,10 @@ export default function NuevaCotizacion() {
     }
   }
 
-  const addItem = () => {
-    setItems([...items, { id: Date.now(), service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP" }]);
-  };
-
-  const removeItem = (id: number) => {
-    if (items.length === 1) return;
-    setItems(items.filter((i) => i.id !== id));
-  };
-
-  const updateItem = (id: number, field: keyof LineItem, value: string | number) => {
-    setItems(items.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
-  };
-
   const hasUFItems = items.some((i) => i.currency === "UF");
-
   const netTotal = items.reduce((sum, i) => sum + itemTotalCLP(i, ufValue), 0);
   const ivaAmount = netTotal * IVA;
   const grandTotal = netTotal + ivaAmount;
-
   const selectedCliente = clientes.find((c) => c.id === clientId);
 
   const handleGuardarNuevoCliente = async () => {
@@ -296,130 +273,16 @@ export default function NuevaCotizacion() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Valor UF (CLP)</Label>
-              <Input
-                type="number"
-                min={0}
-                placeholder="Ej: 38500"
-                value={ufValue || ""}
-                onChange={(e) => setUfValue(parseFloat(e.target.value) || 0)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Requerido si algún ítem se cotiza en UF
-              </p>
-            </div>
           </div>
         </div>
 
-        <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-foreground">Servicios / Productos</h2>
-            <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1">
-              <Plus className="h-4 w-4" /> Agregar ítem
-            </Button>
-          </div>
-
-          <div className="space-y-3">
-            {items.map((item, idx) => (
-              <div key={item.id} className="grid grid-cols-12 gap-2 items-end p-3 rounded-lg bg-muted/30 border">
-                <div className="col-span-3 space-y-1">
-                  {idx === 0 && <Label className="text-xs">Servicio/Producto</Label>}
-                  <Input
-                    placeholder="Servicio"
-                    value={item.service}
-                    onChange={(e) => updateItem(item.id, "service", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-3 space-y-1">
-                  {idx === 0 && <Label className="text-xs">Descripción</Label>}
-                  <Input
-                    placeholder="Descripción"
-                    value={item.description}
-                    onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                  />
-                </div>
-                <div className="col-span-1 space-y-1">
-                  {idx === 0 && <Label className="text-xs">Cant.</Label>}
-                  <Input
-                    type="number"
-                    min={1}
-                    value={item.quantity}
-                    onChange={(e) => updateItem(item.id, "quantity", parseInt(e.target.value) || 1)}
-                  />
-                </div>
-                <div className="col-span-2 space-y-1">
-                  {idx === 0 && <Label className="text-xs">Moneda</Label>}
-                  <Select
-                    value={item.currency}
-                    onValueChange={(v) => {
-                      updateItem(item.id, "currency", v);
-                      updateItem(item.id, "unitPrice", 0);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CLP">CLP</SelectItem>
-                      <SelectItem value="UF">UF</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-2 space-y-1">
-                  {idx === 0 && <Label className="text-xs">Valor Unit.</Label>}
-                  <div className="relative">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={item.currency === "UF" ? "0.01" : "1"}
-                      value={item.unitPrice || ""}
-                      onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                      placeholder={item.currency === "UF" ? "Ej: 5.5" : "0"}
-                    />
-                  </div>
-                </div>
-                <div className="col-span-1 flex justify-center pt-5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(item.id)}
-                    disabled={items.length === 1}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t pt-4 space-y-2">
-            <div className="flex justify-end gap-8 text-sm">
-              <span className="text-muted-foreground">Neto</span>
-              <span className="font-medium text-foreground w-32 text-right">
-                ${netTotal.toLocaleString("es-CL")}
-              </span>
-            </div>
-            <div className="flex justify-end gap-8 text-sm">
-              <span className="text-muted-foreground">IVA (19%)</span>
-              <span className="font-medium text-foreground w-32 text-right">
-                ${ivaAmount.toLocaleString("es-CL")}
-              </span>
-            </div>
-            <div className="flex justify-end gap-8 border-t pt-2">
-              <span className="text-sm font-semibold text-foreground">Total</span>
-              <span className="text-2xl font-bold text-foreground w-32 text-right">
-                ${grandTotal.toLocaleString("es-CL")}
-              </span>
-            </div>
-            {hasUFItems && ufValue > 0 && (
-              <p className="text-right text-xs text-muted-foreground">
-                Valor UF utilizado: ${ufValue.toLocaleString("es-CL")}
-              </p>
-            )}
-          </div>
+        <div className="bg-card rounded-xl border shadow-sm p-6">
+          <CotizacionItemsEditor
+            items={items}
+            ufValue={ufValue}
+            onUfValueChange={setUfValue}
+            onItemsChange={setItems}
+          />
         </div>
 
         <div className="flex items-start gap-2 p-4 rounded-lg bg-accent text-accent-foreground text-sm border border-primary/10">
