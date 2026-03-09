@@ -27,6 +27,7 @@ export default function EditarCotizacion() {
   const [executives, setExecutives] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
   const [requirement, setRequirement] = useState("");
+  const [requesterName, setRequesterName] = useState("");
   const [status, setStatus] = useState("");
   const [ufValue, setUfValue] = useState<number>(0);
   const [items, setItems] = useState<LineItem[]>([]);
@@ -47,6 +48,7 @@ export default function EditarCotizacion() {
         setClientId(cotRes.data.client_id);
         setExecutive(cotRes.data.executive);
         setRequirement(cotRes.data.requirement ?? "");
+        setRequesterName(cotRes.data.requester_name ?? "");
         setStatus(cotRes.data.status);
         if (cotRes.data.uf_value) setUfValue(cotRes.data.uf_value);
       }
@@ -102,6 +104,7 @@ export default function EditarCotizacion() {
         client_id: clientId,
         executive,
         requirement,
+        requester_name: requesterName.trim() || null,
         status,
         currency: hasUF ? "MIXTO" : "CLP",
         uf_value: hasUF ? ufValue : null,
@@ -189,6 +192,14 @@ export default function EditarCotizacion() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Nombre y apellido de quien solicita</Label>
+            <Input
+              placeholder="Ej: Juan Pérez"
+              value={requesterName}
+              onChange={(e) => setRequesterName(e.target.value)}
+            />
           </div>
         </div>
 

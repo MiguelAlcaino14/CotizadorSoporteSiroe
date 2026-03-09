@@ -22,6 +22,7 @@ export type Cotizacion = {
   currency: string;
   status: string;
   requirement: string;
+  requester_name: string | null;
   version: number;
   uf_value: number | null;
   created_at: string;
@@ -51,6 +52,7 @@ export type CotizacionVersion = {
   currency: string | null;
   executive: string | null;
   requirement: string | null;
+  requester_name: string | null;
   uf_value: number | null;
 };
 

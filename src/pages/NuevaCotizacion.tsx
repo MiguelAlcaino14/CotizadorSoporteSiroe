@@ -43,6 +43,7 @@ export default function NuevaCotizacion() {
   const [executive, setExecutive] = useState("");
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
+  const [requesterName, setRequesterName] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [executives, setExecutives] = useState<string[]>([]);
   const [nextId, setNextId] = useState("COT-001");
@@ -172,6 +173,7 @@ export default function NuevaCotizacion() {
       currency: hasUFItems ? "MIXTO" : "CLP",
       status: "Borrador",
       requirement,
+      requester_name: requesterName.trim() || null,
       version: 1,
       uf_value: hasUFItems ? ufValue : null,
     });
@@ -207,6 +209,7 @@ export default function NuevaCotizacion() {
       currency: hasUFItems ? "MIXTO" : "CLP",
       executive,
       requirement,
+      requester_name: requesterName.trim() || null,
       uf_value: hasUFItems ? ufValue : null,
     });
 
@@ -254,6 +257,14 @@ export default function NuevaCotizacion() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Nombre y apellido de quien solicita</Label>
+            <Input
+              placeholder="Ej: Juan Pérez"
+              value={requesterName}
+              onChange={(e) => setRequesterName(e.target.value)}
+            />
           </div>
         </div>
 

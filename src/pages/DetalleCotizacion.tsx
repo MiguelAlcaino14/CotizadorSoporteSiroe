@@ -172,6 +172,7 @@ export default function DetalleCotizacion() {
       currency: quote.currency,
       executive: quote.executive,
       requirement: quote.requirement,
+      requester_name: quote.requester_name ?? null,
       uf_value: currentUfValue > 0 ? currentUfValue : null,
     });
 
@@ -270,6 +271,7 @@ export default function DetalleCotizacion() {
           <h2 className="font-semibold text-foreground">Detalles de Cotización</h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">N° Requerimiento</span><span className="text-foreground">{quote.requirement || "-"}</span></div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Solicitado por</span><span className="text-foreground">{quote.requester_name || "-"}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Ejecutivo</span><span className="text-foreground">{quote.executive}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Moneda</span><span className="text-foreground">{quote.currency}</span></div>
             {quote.uf_value != null && (
@@ -295,6 +297,9 @@ export default function DetalleCotizacion() {
                   </span>
                   {v.requirement && (
                     <span className="text-sm text-muted-foreground">Req: {v.requirement}</span>
+                  )}
+                  {v.requester_name && (
+                    <span className="text-sm text-muted-foreground">Solicitado por: {v.requester_name}</span>
                   )}
                 </div>
                 <div className="flex items-center gap-3">
