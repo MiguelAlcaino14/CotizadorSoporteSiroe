@@ -1,4 +1,4 @@
-const BASE_URL = "https://api-ticketera.siroe.cl";
+const BASE_URL = import.meta.env.VITE_TICKETERA_API_URL ?? "https://api-ticketera.siroe.cl";
 
 let cachedToken: string | null = null;
 let tokenExpiry: number | null = null;
