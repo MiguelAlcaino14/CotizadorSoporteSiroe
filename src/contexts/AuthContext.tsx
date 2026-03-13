@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase, type Profile } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import type { Profile } from "@/lib/supabase";
+
+type AuthUser = { id: string; email: string };
 
 type AuthContextType = {
-  session: Session | null;
-  user: User | null;
+  session: { access_token: string } | null;
+  user: AuthUser | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -14,61 +16,51 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
-    setProfile(data as Profile | null);
-  }
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
+    const token = localStorage.getItem("auth_token");
+    const stored = localStorage.getItem("auth_user");
+    if (token && stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setUser({ id: parsed.id, email: parsed.email });
+        setProfile({ id: parsed.id, email: parsed.email, role: parsed.role, full_name: parsed.full_name, created_at: parsed.created_at ?? "" });
+      } catch {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_user");
       }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        (async () => {
-          await fetchProfile(session.user.id);
-        })();
-      } else {
-        setProfile(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    }
+    setLoading(false);
   }, []);
 
   async function signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: error.message };
-    if (data.user) {
-      await supabase.from("login_logs").insert({
-        user_id: data.user.id,
-        email: data.user.email ?? "",
-      });
+    try {
+      const data = await api.post<{ access_token: string; user: Profile & { id: string; email: string } }>(
+        "/auth/login",
+        { email, password }
+      );
+      localStorage.setItem("auth_token", data.access_token);
+      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      setUser({ id: data.user.id, email: data.user.email });
+      setProfile({ id: data.user.id, email: data.user.email, role: data.user.role, full_name: data.user.full_name, created_at: "" });
+      return { error: null };
+    } catch (e: any) {
+      return { error: e.message ?? "Error al iniciar sesión" };
     }
-    return { error: null };
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    try { await api.post("/auth/logout", {}); } catch { /* ignorar */ }
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+    setUser(null);
+    setProfile(null);
   }
+
+  const session = user ? { access_token: localStorage.getItem("auth_token") ?? "" } : null;
 
   return (
     <AuthContext.Provider value={{ session, user, profile, loading, signIn, signOut }}>

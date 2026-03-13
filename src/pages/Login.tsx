@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 
@@ -33,15 +33,13 @@ export default function Login() {
   const handleRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
     setSendingReset(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(recoveryEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) {
-      toast.error("No se pudo enviar el correo. Verifica el email ingresado.");
-    } else {
+    try {
+      await api.post("/auth/forgot-password", { email: recoveryEmail });
       toast.success("Revisa tu correo para restablecer tu contraseña.");
       setMode("login");
       setRecoveryEmail("");
+    } catch {
+      toast.error("No se pudo enviar el correo. Verifica el email ingresado.");
     }
     setSendingReset(false);
   };

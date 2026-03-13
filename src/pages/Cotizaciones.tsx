@@ -20,7 +20,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, type Cotizacion } from "@/lib/supabase";
+import { type Cotizacion } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const statusColors: Record<string, string> = {
@@ -29,6 +30,22 @@ const statusColors: Record<string, string> = {
   Pendiente: "bg-warning/10 text-warning border-warning/20",
   Facturada: "bg-muted text-muted-foreground border-border",
   Borrador: "bg-secondary text-secondary-foreground border-border",
+};
+
+type ApiCotizacion = {
+  id: string;
+  clientId: string;
+  executive: string;
+  currency: string;
+  status: string;
+  requirement: string;
+  requesterName: string | null;
+  version: number;
+  ufValue: number | null;
+  validityDays: number;
+  createdAt: string;
+  updatedAt: string;
+  clientes: { name: string } | null;
 };
 
 type CotizacionWithCliente = Cotizacion & { clientes: { name: string } | null };
@@ -46,11 +63,29 @@ export default function Cotizaciones() {
 
   useEffect(() => {
     async function fetchQuotes() {
-      const { data } = await supabase
-        .from("cotizaciones")
-        .select("*, clientes(name)")
-        .order("created_at", { ascending: false });
-      if (data) setQuotes(data as CotizacionWithCliente[]);
+      try {
+        const data = await api.get<ApiCotizacion[]>("/cotizaciones");
+        if (data) {
+          const mapped: CotizacionWithCliente[] = data.map((q) => ({
+            id: q.id,
+            client_id: q.clientId,
+            executive: q.executive,
+            currency: q.currency,
+            status: q.status,
+            requirement: q.requirement,
+            requester_name: q.requesterName,
+            version: q.version,
+            uf_value: q.ufValue,
+            validity_days: q.validityDays,
+            created_at: q.createdAt,
+            updated_at: q.updatedAt,
+            clientes: q.clientes,
+          }));
+          setQuotes(mapped);
+        }
+      } catch {
+        toast.error("Error al cargar las cotizaciones");
+      }
       setLoading(false);
     }
     fetchQuotes();
@@ -59,15 +94,14 @@ export default function Cotizaciones() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    const { error } = await supabase.from("cotizaciones").delete().eq("id", deleteTarget.id);
-    if (error) {
+    try {
+      await api.delete(`/cotizaciones/${deleteTarget.id}`);
+      setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id));
+      toast.success(`Cotización ${deleteTarget.id} eliminada`);
+      setDeleteTarget(null);
+    } catch {
       toast.error("Error al eliminar la cotización");
-      setDeleting(false);
-      return;
     }
-    setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id));
-    toast.success(`Cotización ${deleteTarget.id} eliminada`);
-    setDeleteTarget(null);
     setDeleting(false);
   };
 

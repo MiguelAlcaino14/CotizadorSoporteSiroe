@@ -14,7 +14,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, type Cotizacion, type CotizacionItem, type CotizacionVersion, type Documento } from "@/lib/supabase";
+import { type Cotizacion, type CotizacionItem, type CotizacionVersion, type Documento } from "@/lib/supabase";
+import { api } from "@/lib/api";
 
 const statusColors: Record<string, string> = {
   Aprobada: "bg-success/10 text-success border-success/20",
@@ -26,6 +27,65 @@ const statusColors: Record<string, string> = {
 
 type CotizacionFull = Cotizacion & {
   clientes: { name: string; rut: string; email: string; phone: string } | null;
+};
+
+type ApiCotizacionFull = {
+  id: string;
+  clientId: string;
+  executive: string;
+  currency: string;
+  status: string;
+  requirement: string;
+  requesterName: string | null;
+  version: number;
+  ufValue: number | null;
+  validityDays: number;
+  createdAt: string;
+  updatedAt: string;
+  terms: string | null;
+  clientes: { name: string; rut: string; email: string; phone: string } | null;
+  items: ApiItem[];
+  versiones: ApiVersion[];
+  documentos: ApiDocumento[];
+};
+
+type ApiItem = {
+  id: string;
+  cotizacionId: string;
+  service: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  currency: string;
+  category: string;
+  rentalPeriod: string | null;
+  rentalFrom: string | null;
+  rentalTo: string | null;
+  createdAt: string;
+};
+
+type ApiVersion = {
+  id: string;
+  cotizacionId: string;
+  version: number;
+  status: string;
+  createdAt: string;
+  itemsSnapshot: ApiItem[] | null;
+  total: number | null;
+  currency: string | null;
+  executive: string | null;
+  requirement: string | null;
+  requesterName: string | null;
+  ufValue: number | null;
+};
+
+type ApiDocumento = {
+  id: string;
+  cotizacionId: string;
+  name: string;
+  type: string;
+  url: string;
+  createdAt: string;
 };
 
 export default function DetalleCotizacion() {
@@ -61,16 +121,86 @@ export default function DetalleCotizacion() {
   useEffect(() => {
     if (!id) return;
     async function fetchData() {
-      const [quoteRes, itemsRes, versionsRes, docsRes] = await Promise.all([
-        supabase.from("cotizaciones").select("*, clientes(name, rut, email, phone)").eq("id", id).maybeSingle(),
-        supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
-        supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version"),
-        supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at"),
-      ]);
-      if (quoteRes.data) setQuote(quoteRes.data as CotizacionFull);
-      if (itemsRes.data) setItems(itemsRes.data);
-      if (versionsRes.data) setVersions(versionsRes.data);
-      if (docsRes.data) setDocumentos(docsRes.data);
+      try {
+        const data = await api.get<ApiCotizacionFull>(`/cotizaciones/${id}`);
+        if (data) {
+          const mappedQuote: CotizacionFull = {
+            id: data.id,
+            client_id: data.clientId,
+            executive: data.executive,
+            currency: data.currency,
+            status: data.status,
+            requirement: data.requirement,
+            requester_name: data.requesterName,
+            version: data.version,
+            uf_value: data.ufValue,
+            validity_days: data.validityDays,
+            created_at: data.createdAt,
+            updated_at: data.updatedAt,
+            clientes: data.clientes,
+          };
+          setQuote(mappedQuote);
+
+          const mappedItems: CotizacionItem[] = (data.items ?? []).map((i) => ({
+            id: i.id,
+            cotizacion_id: i.cotizacionId,
+            service: i.service,
+            description: i.description,
+            quantity: i.quantity,
+            unit_price: i.unitPrice,
+            currency: i.currency,
+            category: i.category,
+            rental_period: i.rentalPeriod,
+            rental_from: i.rentalFrom,
+            rental_to: i.rentalTo,
+            created_at: i.createdAt,
+          }));
+          setItems(mappedItems);
+
+          const mappedVersions: CotizacionVersion[] = (data.versiones ?? []).map((v) => ({
+            id: v.id,
+            cotizacion_id: v.cotizacionId,
+            version: v.version,
+            status: v.status,
+            created_at: v.createdAt,
+            items_snapshot: v.itemsSnapshot
+              ? v.itemsSnapshot.map((i) => ({
+                  id: i.id,
+                  cotizacion_id: i.cotizacionId,
+                  service: i.service,
+                  description: i.description,
+                  quantity: i.quantity,
+                  unit_price: i.unitPrice,
+                  currency: i.currency,
+                  category: i.category,
+                  rental_period: i.rentalPeriod,
+                  rental_from: i.rentalFrom,
+                  rental_to: i.rentalTo,
+                  created_at: i.createdAt,
+                }))
+              : null,
+            total: v.total,
+            currency: v.currency,
+            executive: v.executive,
+            requirement: v.requirement,
+            requester_name: v.requesterName,
+            uf_value: v.ufValue,
+          }));
+          setVersions(mappedVersions);
+
+          const mappedDocumentos: Documento[] = (data.documentos ?? []).map((d) => ({
+            id: d.id,
+            cotizacion_id: d.cotizacionId,
+            name: d.name,
+            type: d.type,
+            url: d.url,
+            created_at: d.createdAt,
+          }));
+          setDocumentos(mappedDocumentos);
+        }
+      } catch {
+        toast.error("Error al cargar la cotización");
+      }
       setLoading(false);
     }
     fetchData();
@@ -82,20 +212,32 @@ export default function DetalleCotizacion() {
     return s + (i.currency === "UF" ? lineTotal * ufValue : lineTotal);
   }, 0);
 
-  const uploadFile = async (file: File, type: string, prefix: string) => {
+  const uploadFile = async (file: File, type: string, _prefix: string) => {
     if (!id) return null;
     setUploading(true);
-    const ext = file.name.split(".").pop();
-    const storagePath = `${id}/${prefix}_${Date.now()}.${ext}`;
-    const { error: storageError } = await supabase.storage.from("documentos").upload(storagePath, file, { upsert: false });
-    if (storageError) { toast.error(`Error al subir el archivo: ${storageError.message}`); setUploading(false); return null; }
-    const { data: urlData } = supabase.storage.from("documentos").getPublicUrl(storagePath);
-    const { error: dbError } = await supabase.from("documentos").insert({ cotizacion_id: id, name: file.name, type, url: urlData.publicUrl });
-    if (dbError) { toast.error("Error al registrar el documento"); setUploading(false); return null; }
-    const { data } = await supabase.from("documentos").select("*").eq("cotizacion_id", id).order("created_at");
-    if (data) setDocumentos(data);
-    setUploading(false);
-    return urlData.publicUrl;
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("cotizacion_id", id);
+      formData.append("name", file.name);
+      formData.append("type", type);
+      const doc = await api.upload<ApiDocumento>("/documentos", formData);
+      const newDoc: Documento = {
+        id: doc.id,
+        cotizacion_id: doc.cotizacionId,
+        name: doc.name,
+        type: doc.type,
+        url: doc.url,
+        created_at: doc.createdAt,
+      };
+      setDocumentos((prev) => [...prev, newDoc]);
+      setUploading(false);
+      return doc.url;
+    } catch (err: any) {
+      toast.error(`Error al subir el archivo: ${err.message}`);
+      setUploading(false);
+      return null;
+    }
   };
 
   const handleApprovalFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,43 +264,85 @@ export default function DetalleCotizacion() {
   };
 
   const handleDeleteDocumento = async (docId: string) => {
-    const { error } = await supabase.from("documentos").delete().eq("id", docId);
-    if (error) { toast.error("Error al eliminar documento"); return; }
-    setDocumentos((prev) => prev.filter((d) => d.id !== docId));
-    toast.success("Documento eliminado");
+    try {
+      await api.delete(`/documentos/${docId}`);
+      setDocumentos((prev) => prev.filter((d) => d.id !== docId));
+      toast.success("Documento eliminado");
+    } catch {
+      toast.error("Error al eliminar documento");
+    }
   };
 
   const handleNuevaVersion = async () => {
     if (!quote || !id) return;
-    const newVersion = quote.version + 1;
-    const currentUfValue = quote.uf_value ?? 0;
-    const currentTotal = items.reduce((s, i) => {
-      const lineTotal = i.quantity * i.unit_price;
-      return s + (i.currency === "UF" ? lineTotal * currentUfValue : lineTotal);
-    }, 0);
-    await supabase.from("cotizacion_versiones").update({ status: "Reemplazada" }).eq("cotizacion_id", id).eq("status", "Vigente");
-    await supabase.from("cotizacion_versiones").insert({
-      cotizacion_id: id, version: newVersion, status: "Vigente", items_snapshot: items,
-      total: currentTotal, currency: quote.currency, executive: quote.executive,
-      requirement: quote.requirement, requester_name: quote.requester_name ?? null, uf_value: currentUfValue > 0 ? currentUfValue : null,
-    });
-    await supabase.from("cotizaciones").update({ version: newVersion }).eq("id", id);
-    const [updatedQuote, updatedVersions] = await Promise.all([
-      supabase.from("cotizaciones").select("*, clientes(name, rut, email, phone)").eq("id", id).maybeSingle(),
-      supabase.from("cotizacion_versiones").select("*").eq("cotizacion_id", id).order("version"),
-    ]);
-    if (updatedQuote.data) setQuote(updatedQuote.data as CotizacionFull);
-    if (updatedVersions.data) setVersions(updatedVersions.data);
-    toast.success(`Nueva versión v${newVersion} creada`);
+    try {
+      const result = await api.post<{ message: string; cotizacion: { version: number } }>(`/cotizaciones/${id}/versiones`, {});
+      // Reload full cotizacion to get updated versions and quote
+      const data = await api.get<ApiCotizacionFull>(`/cotizaciones/${id}`);
+      if (data) {
+        setQuote({
+          id: data.id,
+          client_id: data.clientId,
+          executive: data.executive,
+          currency: data.currency,
+          status: data.status,
+          requirement: data.requirement,
+          requester_name: data.requesterName,
+          version: data.version,
+          uf_value: data.ufValue,
+          validity_days: data.validityDays,
+          created_at: data.createdAt,
+          updated_at: data.updatedAt,
+          clientes: data.clientes,
+        });
+        const mappedVersions: CotizacionVersion[] = (data.versiones ?? []).map((v) => ({
+          id: v.id,
+          cotizacion_id: v.cotizacionId,
+          version: v.version,
+          status: v.status,
+          created_at: v.createdAt,
+          items_snapshot: v.itemsSnapshot
+            ? v.itemsSnapshot.map((i) => ({
+                id: i.id,
+                cotizacion_id: i.cotizacionId,
+                service: i.service,
+                description: i.description,
+                quantity: i.quantity,
+                unit_price: i.unitPrice,
+                currency: i.currency,
+                category: i.category,
+                rental_period: i.rentalPeriod,
+                rental_from: i.rentalFrom,
+                rental_to: i.rentalTo,
+                created_at: i.createdAt,
+              }))
+            : null,
+          total: v.total,
+          currency: v.currency,
+          executive: v.executive,
+          requirement: v.requirement,
+          requester_name: v.requesterName,
+          uf_value: v.ufValue,
+        }));
+        setVersions(mappedVersions);
+      }
+      toast.success(`Nueva versión v${result.cotizacion.version} creada`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Error al crear nueva versión");
+    }
   };
 
   const handleDelete = async () => {
     if (!id) return;
     setDeleting(true);
-    const { error } = await supabase.from("cotizaciones").delete().eq("id", id);
-    if (error) { toast.error("Error al eliminar la cotización"); setDeleting(false); return; }
-    toast.success(`Cotización ${id} eliminada`);
-    navigate("/cotizaciones");
+    try {
+      await api.delete(`/cotizaciones/${id}`);
+      toast.success(`Cotización ${id} eliminada`);
+      navigate("/cotizaciones");
+    } catch {
+      toast.error("Error al eliminar la cotización");
+      setDeleting(false);
+    }
   };
 
   if (loading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Cargando...</p></div>;

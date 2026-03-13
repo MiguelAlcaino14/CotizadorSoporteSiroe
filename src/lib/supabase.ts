@@ -1,9 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Tipos del dominio — el cliente Supabase fue reemplazado por src/lib/api.ts
 
 export type Cliente = {
   id: string;
@@ -114,17 +109,11 @@ export type AppConfig = {
 };
 
 export async function getAppConfigs(keys: string[]): Promise<Record<string, string[]>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token ?? supabaseAnonKey;
-  const keysParam = keys.map((k) => `"${k}"`).join(",");
-  const url = `${supabaseUrl}/rest/v1/app_config?key=in.(${keysParam})&select=key,values`;
-  const res = await fetch(url, {
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!res.ok) return {};
-  const rows: { key: string; values: string[] }[] = await res.json();
-  return Object.fromEntries(rows.map((r) => [r.key, Array.isArray(r.values) ? r.values : []]));
+  const { api } = await import("./api");
+  const configs: AppConfig[] = await api.get("/configuracion/app-config");
+  return Object.fromEntries(
+    configs
+      .filter((c) => keys.includes(c.key))
+      .map((c) => [c.key, Array.isArray(c.values) ? c.values : []])
+  );
 }

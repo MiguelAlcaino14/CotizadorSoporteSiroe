@@ -4,7 +4,8 @@ import { StatCard } from "@/components/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { supabase, type Cotizacion } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import { type Cotizacion } from "@/lib/supabase";
 
 const statusColors: Record<string, string> = {
   Aprobada: "bg-success/10 text-success border-success/20",
@@ -35,43 +36,25 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
-      const [quotesRes, allRes] = await Promise.all([
-        supabase
-          .from("cotizaciones")
-          .select("*, clientes(name)")
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase.from("cotizaciones").select("status, created_at"),
+      const [all, docs] = await Promise.all([
+        api.get<Cotizacion[]>("/cotizaciones"),
+        api.get<{ name: string; cotizacion_id: string; created_at: string }[]>("/documentos"),
       ]);
 
-      if (quotesRes.data) {
-        setRecentQuotes(quotesRes.data as Cotizacion[]);
-      }
+      const recent = [...all].slice(0, 5);
+      setRecentQuotes(recent);
+      setStats({
+        total: all.length,
+        aprobadas: all.filter((q) => q.status === "Aprobada").length,
+        enEjecucion: all.filter((q) => q.status === "En ejecución").length,
+        pendientesFacturacion: all.filter((q) => q.status === "Facturada").length,
+      });
 
-      if (allRes.data) {
-        const all = allRes.data;
-        setStats({
-          total: all.length,
-          aprobadas: all.filter((q) => q.status === "Aprobada").length,
-          enEjecucion: all.filter((q) => q.status === "En ejecución").length,
-          pendientesFacturacion: all.filter((q) => q.status === "Facturada").length,
-        });
-      }
-
-      const docsRes = await supabase
-        .from("documentos")
-        .select("name, cotizacion_id, created_at")
-        .order("created_at", { ascending: false })
-        .limit(4);
-
-      if (docsRes.data) {
-        const acts: Activity[] = docsRes.data.map((d) => ({
-          text: `Documento "${d.name}" subido para ${d.cotizacion_id}`,
-          time: new Date(d.created_at).toLocaleDateString("es-CL"),
-        }));
-        setActivity(acts);
-      }
-
+      const acts: Activity[] = docs.slice(0, 4).map((d) => ({
+        text: `Documento "${d.name}" subido para ${d.cotizacion_id}`,
+        time: new Date(d.created_at).toLocaleDateString("es-CL"),
+      }));
+      setActivity(acts);
       setLoading(false);
     }
 

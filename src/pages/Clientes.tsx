@@ -13,8 +13,20 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, type Cliente } from "@/lib/supabase";
+import { type Cliente } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+
+type ApiCliente = {
+  id: string;
+  name: string;
+  rut: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+  cotizaciones?: { id: string }[];
+};
 
 type ClienteWithCount = Cliente & { quotes: number };
 type ClienteForm = { name: string; rut: string; email: string; phone: string; address: string };
@@ -36,14 +48,24 @@ export default function Clientes() {
   const [deleting, setDeleting] = useState(false);
 
   async function fetchClientes() {
-    const { data: clientesData } = await supabase.from("clientes").select("*").order("name");
-    const { data: cotizacionesData } = await supabase.from("cotizaciones").select("client_id");
-    if (clientesData) {
-      const countMap: Record<string, number> = {};
-      (cotizacionesData ?? []).forEach((c) => {
-        countMap[c.client_id] = (countMap[c.client_id] ?? 0) + 1;
-      });
-      setClientes(clientesData.map((c) => ({ ...c, quotes: countMap[c.id] ?? 0 })));
+    try {
+      const clientesData = await api.get<ApiCliente[]>("/clientes");
+      if (clientesData) {
+        setClientes(
+          clientesData.map((c) => ({
+            id: c.id,
+            name: c.name,
+            rut: c.rut,
+            email: c.email,
+            phone: c.phone,
+            address: c.address,
+            created_at: c.createdAt,
+            quotes: c.cotizaciones?.length ?? 0,
+          }))
+        );
+      }
+    } catch {
+      toast.error("Error al cargar los clientes");
     }
     setLoading(false);
   }
@@ -74,21 +96,27 @@ export default function Clientes() {
     setSaving(true);
 
     if (editingId) {
-      const { error } = await supabase.from("clientes").update({
-        name: form.name, rut: form.rut, email: form.email, phone: form.phone, address: form.address,
-      }).eq("id", editingId);
-      if (error) { toast.error("Error al actualizar el cliente"); setSaving(false); return; }
-      toast.success(`Cliente ${form.name} actualizado`);
-    } else {
-      const { error } = await supabase.from("clientes").insert({
-        name: form.name, rut: form.rut, email: form.email, phone: form.phone, address: form.address,
-      });
-      if (error) {
-        toast.error(error.code === "23505" ? "El RUT ya existe" : "Error al guardar el cliente");
+      try {
+        await api.put(`/clientes/${editingId}`, {
+          name: form.name, rut: form.rut, email: form.email, phone: form.phone, address: form.address,
+        });
+        toast.success(`Cliente ${form.name} actualizado`);
+      } catch (err: any) {
+        toast.error(err.message?.includes("RUT") ? "El RUT ya existe" : "Error al actualizar el cliente");
         setSaving(false);
         return;
       }
-      toast.success(`Cliente ${form.name} creado`);
+    } else {
+      try {
+        await api.post("/clientes", {
+          name: form.name, rut: form.rut, email: form.email, phone: form.phone, address: form.address,
+        });
+        toast.success(`Cliente ${form.name} creado`);
+      } catch (err: any) {
+        toast.error(err.message?.includes("RUT") ? "El RUT ya existe" : "Error al guardar el cliente");
+        setSaving(false);
+        return;
+      }
     }
 
     setShowModal(false);
@@ -101,12 +129,15 @@ export default function Clientes() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    const { error } = await supabase.from("clientes").delete().eq("id", deleteTarget.id);
-    if (error) { toast.error("Error al eliminar el cliente"); setDeleting(false); return; }
-    toast.success(`Cliente ${deleteTarget.name} eliminado`);
-    setDeleteTarget(null);
+    try {
+      await api.delete(`/clientes/${deleteTarget.id}`);
+      toast.success(`Cliente ${deleteTarget.name} eliminado`);
+      setDeleteTarget(null);
+      await fetchClientes();
+    } catch {
+      toast.error("Error al eliminar el cliente");
+    }
     setDeleting(false);
-    await fetchClientes();
   };
 
   return (

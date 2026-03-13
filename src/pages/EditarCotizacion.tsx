@@ -13,9 +13,51 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { supabase, getAppConfigs, type Cliente, type CotizacionItem } from "@/lib/supabase";
+import { getAppConfigs, type Cliente } from "@/lib/supabase";
+
+type ApiCliente = {
+  id: string;
+  name: string;
+  rut: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+};
+import { api } from "@/lib/api";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
+
+type ApiCotizacion = {
+  id: string;
+  clientId: string;
+  executive: string;
+  currency: string;
+  status: string;
+  requirement: string;
+  requesterName: string | null;
+  version: number;
+  ufValue: number | null;
+  validityDays: number;
+  createdAt: string;
+  updatedAt: string;
+  terms: string | null;
+};
+
+type ApiItem = {
+  id: string;
+  cotizacionId: string;
+  service: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  currency: string;
+  category: string;
+  rentalPeriod: string | null;
+  rentalFrom: string | null;
+  rentalTo: string | null;
+  createdAt: string;
+};
 
 export default function EditarCotizacion() {
   const { id } = useParams<{ id: string }>();
@@ -42,42 +84,57 @@ export default function EditarCotizacion() {
   useEffect(() => {
     if (!id) return;
     async function load() {
-      const [cotRes, itemsRes, clientesRes, configs] = await Promise.all([
-        supabase.from("cotizaciones").select("*").eq("id", id).maybeSingle(),
-        supabase.from("cotizacion_items").select("*").eq("cotizacion_id", id),
-        supabase.from("clientes").select("*").order("name"),
-        getAppConfigs(["executives", "statuses"]),
-      ]);
-      setExecutives(configs["executives"] ?? []);
-      setStatuses(configs["statuses"] ?? []);
-      if (cotRes.data) {
-        setClientId(cotRes.data.client_id);
-        setExecutive(cotRes.data.executive);
-        setRequirement(cotRes.data.requirement ?? "");
-        setRequesterName(cotRes.data.requester_name ?? "");
-        setStatus(cotRes.data.status);
-        setVersion(cotRes.data.version ?? 1);
-        setValidityDays(cotRes.data.validity_days ?? 30);
-        if (cotRes.data.uf_value) setUfValue(cotRes.data.uf_value);
-        setTerms(cotRes.data.terms ?? "");
+      try {
+        const [cotData, clientesData, configs] = await Promise.all([
+          api.get<ApiCotizacion & { items: ApiItem[] }>(`/cotizaciones/${id}`),
+          api.get<ApiCliente[]>("/clientes"),
+          getAppConfigs(["executives", "statuses"]),
+        ]);
+        setExecutives(configs["executives"] ?? []);
+        setStatuses(configs["statuses"] ?? []);
+        if (cotData) {
+          setClientId(cotData.clientId);
+          setExecutive(cotData.executive);
+          setRequirement(cotData.requirement ?? "");
+          setRequesterName(cotData.requesterName ?? "");
+          setStatus(cotData.status);
+          setVersion(cotData.version ?? 1);
+          setValidityDays(cotData.validityDays ?? 30);
+          if (cotData.ufValue) setUfValue(cotData.ufValue);
+          setTerms(cotData.terms ?? "");
+          if (cotData.items) {
+            setItems(
+              cotData.items.map((i) => ({
+                id: i.id,
+                service: i.service,
+                description: i.description,
+                quantity: i.quantity,
+                unitPrice: i.unitPrice,
+                currency: (i.currency as "CLP" | "UF") ?? "CLP",
+                category: i.category || "Servicio",
+                rentalPeriod: i.rentalPeriod || "",
+                rentalFrom: i.rentalFrom ? new Date(i.rentalFrom + "T12:00:00") : null,
+                rentalTo: i.rentalTo ? new Date(i.rentalTo + "T12:00:00") : null,
+              }))
+            );
+          }
+        }
+        if (clientesData) {
+          setClientes(
+            clientesData.map((c) => ({
+              id: c.id,
+              name: c.name,
+              rut: c.rut,
+              email: c.email,
+              phone: c.phone,
+              address: c.address,
+              created_at: c.createdAt,
+            }))
+          );
+        }
+      } catch {
+        toast.error("Error al cargar los datos");
       }
-      if (itemsRes.data) {
-        setItems(
-          (itemsRes.data as CotizacionItem[]).map((i) => ({
-            id: i.id,
-            service: i.service,
-            description: i.description,
-            quantity: i.quantity,
-            unitPrice: i.unit_price,
-            currency: (i.currency as "CLP" | "UF") ?? "CLP",
-            category: i.category || "Servicio",
-            rentalPeriod: i.rental_period || "",
-            rentalFrom: i.rental_from ? new Date(i.rental_from + "T12:00:00") : null,
-            rentalTo: i.rental_to ? new Date(i.rental_to + "T12:00:00") : null,
-          }))
-        );
-      }
-      if (clientesRes.data) setClientes(clientesRes.data);
       setLoading(false);
     }
     load();
@@ -146,9 +203,20 @@ export default function EditarCotizacion() {
     }
     setSaving(true);
 
-    const { error: cotError } = await supabase
-      .from("cotizaciones")
-      .update({
+    try {
+      const allItems = items.map((i) => ({
+        service: i.service,
+        description: i.description,
+        quantity: i.quantity,
+        unit_price: i.unitPrice,
+        currency: i.currency,
+        category: i.category || "Servicio",
+        rental_period: i.rentalPeriod || null,
+        rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
+        rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
+      }));
+
+      await api.put(`/cotizaciones/${id}`, {
         client_id: clientId,
         executive,
         requirement,
@@ -157,59 +225,15 @@ export default function EditarCotizacion() {
         currency: hasUF ? "MIXTO" : "CLP",
         uf_value: hasUF ? ufValue : null,
         terms: terms.trim() || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
+        items: allItems,
+      });
 
-    if (cotError) {
+      toast.success(`Cotización ${id} actualizada`);
+      navigate(`/cotizaciones/${id}`);
+    } catch {
       toast.error("Error al actualizar la cotización");
       setSaving(false);
-      return;
     }
-
-    if (deletedItemIds.length > 0) {
-      await supabase.from("cotizacion_items").delete().in("id", deletedItemIds);
-    }
-
-    const newItems = items.filter((i) => i.isNew);
-    const existingItems = items.filter((i) => !i.isNew);
-
-    if (newItems.length > 0) {
-      await supabase.from("cotizacion_items").insert(
-        newItems.map((i) => ({
-          cotizacion_id: id,
-          service: i.service,
-          description: i.description,
-          quantity: i.quantity,
-          unit_price: i.unitPrice,
-          currency: i.currency,
-          category: i.category || "Servicio",
-          rental_period: i.rentalPeriod || null,
-          rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
-          rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
-        }))
-      );
-    }
-
-    for (const item of existingItems) {
-      await supabase
-        .from("cotizacion_items")
-        .update({
-          service: item.service,
-          description: item.description,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          currency: item.currency,
-          category: item.category || "Servicio",
-          rental_period: item.rentalPeriod || null,
-          rental_from: item.rentalFrom ? item.rentalFrom.toISOString().split("T")[0] : null,
-          rental_to: item.rentalTo ? item.rentalTo.toISOString().split("T")[0] : null,
-        })
-        .eq("id", item.id);
-    }
-
-    toast.success(`Cotización ${id} actualizada`);
-    navigate(`/cotizaciones/${id}`);
   };
 
   if (loading) {
@@ -307,14 +331,11 @@ export default function EditarCotizacion() {
             onUfValueChange={setUfValue}
             onItemsChange={handleItemsChange}
             onSaveUfValue={async (v) => {
-              const { error } = await supabase
-                .from("cotizaciones")
-                .update({ uf_value: v })
-                .eq("id", id);
-              if (error) {
-                toast.error("Error al guardar el valor UF");
-              } else {
+              try {
+                await api.put(`/cotizaciones/${id}`, { uf_value: v });
                 toast.success(`Valor UF $${v.toLocaleString("es-CL")} guardado`);
+              } catch {
+                toast.error("Error al guardar el valor UF");
               }
             }}
           />

@@ -21,9 +21,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { supabase, type Cliente } from "@/lib/supabase";
+import { type Cliente } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
+
+type ApiCliente = {
+  id: string;
+  name: string;
+  rut: string;
+  email: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+};
 
 const IVA = 0.19;
 
@@ -77,19 +88,48 @@ export default function NuevaCotizacion() {
   }, [profile]);
 
   async function loadData() {
-    const [clientesRes, cotizacionesRes] = await Promise.all([
-      supabase.from("clientes").select("*").order("name"),
-      supabase.from("cotizaciones").select("id").order("id", { ascending: false }).limit(1),
-    ]);
-    if (clientesRes.data) setClientes(clientesRes.data);
-    if (cotizacionesRes.data && cotizacionesRes.data.length > 0) {
-      const lastId = cotizacionesRes.data[0].id;
-      const num = parseInt(lastId.replace("COT-", ""), 10);
-      const generated = `COT-${String(num + 1).padStart(3, "0")}`;
-      setNextId(generated);
-      setCustomId(generated);
-    } else {
-      setCustomId("COT-001");
+    try {
+      const [clientesData, cotizacionesData] = await Promise.all([
+        api.get<ApiCliente[]>("/clientes"),
+        api.get<{ id: string }[]>("/cotizaciones"),
+      ]);
+      if (clientesData) {
+        setClientes(
+          clientesData.map((c) => ({
+            id: c.id,
+            name: c.name,
+            rut: c.rut,
+            email: c.email,
+            phone: c.phone,
+            address: c.address,
+            created_at: c.createdAt,
+          }))
+        );
+      }
+      if (cotizacionesData && cotizacionesData.length > 0) {
+        // Find the highest COT-XXX id
+        const sortedIds = cotizacionesData
+          .map((c) => c.id)
+          .filter((id) => /^COT-\d+$/.test(id))
+          .sort((a, b) => {
+            const na = parseInt(a.replace("COT-", ""), 10);
+            const nb = parseInt(b.replace("COT-", ""), 10);
+            return nb - na;
+          });
+        if (sortedIds.length > 0) {
+          const lastId = sortedIds[0];
+          const num = parseInt(lastId.replace("COT-", ""), 10);
+          const generated = `COT-${String(num + 1).padStart(3, "0")}`;
+          setNextId(generated);
+          setCustomId(generated);
+        } else {
+          setCustomId("COT-001");
+        }
+      } else {
+        setCustomId("COT-001");
+      }
+    } catch {
+      toast.error("Error al cargar los datos");
     }
   }
 
@@ -105,23 +145,27 @@ export default function NuevaCotizacion() {
       return;
     }
     setSavingCliente(true);
-    const { data, error } = await supabase
-      .from("clientes")
-      .insert(nuevoCliente)
-      .select()
-      .maybeSingle();
-    if (error) {
+    try {
+      const data = await api.post<ApiCliente>("/clientes", nuevoCliente);
+      if (data) {
+        const mapped: Cliente = {
+          id: data.id,
+          name: data.name,
+          rut: data.rut,
+          email: data.email,
+          phone: data.phone,
+          address: data.address,
+          created_at: data.createdAt,
+        };
+        setClientes((prev) => [...prev, mapped].sort((a, b) => a.name.localeCompare(b.name)));
+        setClientId(data.id);
+        toast.success(`Cliente ${data.name} creado`);
+      }
+      setShowNuevoClienteModal(false);
+      setNuevoCliente({ name: "", rut: "", email: "", phone: "", address: "" });
+    } catch {
       toast.error("Error al crear el cliente");
-      setSavingCliente(false);
-      return;
     }
-    if (data) {
-      setClientes((prev) => [...prev, data as Cliente].sort((a, b) => a.name.localeCompare(b.name)));
-      setClientId(data.id);
-      toast.success(`Cliente ${data.name} creado`);
-    }
-    setShowNuevoClienteModal(false);
-    setNuevoCliente({ name: "", rut: "", email: "", phone: "", address: "" });
     setSavingCliente(false);
   };
 
@@ -178,61 +222,42 @@ export default function NuevaCotizacion() {
     const finalId = customId.trim() || nextId;
     setSaving(true);
 
-    const { error: cotError } = await supabase.from("cotizaciones").insert({
-      id: finalId,
-      client_id: clientId,
-      executive,
-      currency: hasUFItems ? "MIXTO" : "CLP",
-      status: "Borrador",
-      requirement,
-      requester_name: requesterName.trim() || null,
-      version: 1,
-      uf_value: hasUFItems ? ufValue : null,
-      validity_days: validityDays,
-      terms: terms.trim() || null,
-    });
+    try {
+      const itemsToInsert = items.map((i) => ({
+        cotizacion_id: finalId,
+        service: i.service,
+        description: i.description,
+        quantity: i.quantity,
+        unit_price: i.unitPrice,
+        currency: i.currency,
+        category: i.category || "Servicio",
+        rental_period: i.rentalPeriod || null,
+        rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
+        rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
+      }));
 
-    if (cotError) {
+      await api.post("/cotizaciones", {
+        id: finalId,
+        client_id: clientId,
+        executive,
+        currency: hasUFItems ? "MIXTO" : "CLP",
+        status: "Borrador",
+        requirement,
+        requester_name: requesterName.trim() || null,
+        version: 1,
+        uf_value: hasUFItems ? ufValue : null,
+        validity_days: validityDays,
+        terms: terms.trim() || null,
+        items: itemsToInsert,
+      });
+
+      toast.success(`Cotización ${finalId} creada exitosamente`);
+      navigate("/cotizaciones");
+    } catch {
       toast.error("Error al crear la cotización");
       setSaving(false);
       return;
     }
-
-    const itemsToInsert = items.map((i) => ({
-      cotizacion_id: finalId,
-      service: i.service,
-      description: i.description,
-      quantity: i.quantity,
-      unit_price: i.unitPrice,
-      currency: i.currency,
-      category: i.category || "Servicio",
-      rental_period: i.rentalPeriod || null,
-      rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
-      rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
-    }));
-
-    const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsToInsert);
-    if (itemsError) {
-      toast.error("Error al guardar los items");
-      setSaving(false);
-      return;
-    }
-
-    await supabase.from("cotizacion_versiones").insert({
-      cotizacion_id: finalId,
-      version: 1,
-      status: "Vigente",
-      items_snapshot: itemsToInsert.map((i) => ({ ...i, id: "", created_at: "" })),
-      total: grandTotal,
-      currency: hasUFItems ? "MIXTO" : "CLP",
-      executive,
-      requirement,
-      requester_name: requesterName.trim() || null,
-      uf_value: hasUFItems ? ufValue : null,
-    });
-
-    toast.success(`Cotización ${finalId} creada exitosamente`);
-    navigate("/cotizaciones");
   };
 
   return (

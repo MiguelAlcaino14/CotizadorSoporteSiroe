@@ -20,8 +20,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { supabase, type Producto } from "@/lib/supabase";
+import { type Producto } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+
+type ApiProducto = {
+  id: string;
+  name: string;
+  description: string;
+  unitPrice: number;
+  currency: "CLP" | "UF";
+  category: string;
+  createdAt: string;
+};
 
 const PRODUCT_CATEGORIES = ["Servicio", "Arriendo de Equipos", "Producto", "Licencia / Software"] as const;
 
@@ -44,8 +55,24 @@ export default function Productos() {
   const [deleting, setDeleting] = useState(false);
 
   async function fetchProductos() {
-    const { data } = await supabase.from("productos").select("*").order("name");
-    if (data) setProductos(data as Producto[]);
+    try {
+      const data = await api.get<ApiProducto[]>("/productos");
+      if (data) {
+        setProductos(
+          data.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            unit_price: p.unitPrice,
+            currency: p.currency,
+            category: p.category,
+            created_at: p.createdAt,
+          }))
+        );
+      }
+    } catch {
+      toast.error("Error al cargar los productos");
+    }
     setLoading(false);
   }
 
@@ -75,13 +102,23 @@ export default function Productos() {
     const payload = { name: form.name, description: form.description, unit_price: price, currency: form.currency, category: form.category };
 
     if (editingId) {
-      const { error } = await supabase.from("productos").update(payload).eq("id", editingId);
-      if (error) { toast.error("Error al actualizar el producto"); setSaving(false); return; }
-      toast.success(`Producto "${form.name}" actualizado`);
+      try {
+        await api.put(`/productos/${editingId}`, payload);
+        toast.success(`Producto "${form.name}" actualizado`);
+      } catch {
+        toast.error("Error al actualizar el producto");
+        setSaving(false);
+        return;
+      }
     } else {
-      const { error } = await supabase.from("productos").insert(payload);
-      if (error) { toast.error("Error al crear el producto"); setSaving(false); return; }
-      toast.success(`Producto "${form.name}" creado`);
+      try {
+        await api.post("/productos", payload);
+        toast.success(`Producto "${form.name}" creado`);
+      } catch {
+        toast.error("Error al crear el producto");
+        setSaving(false);
+        return;
+      }
     }
 
     setShowModal(false);
@@ -94,12 +131,15 @@ export default function Productos() {
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
-    const { error } = await supabase.from("productos").delete().eq("id", deleteTarget.id);
-    if (error) { toast.error("Error al eliminar el producto"); setDeleting(false); return; }
-    toast.success(`Producto "${deleteTarget.name}" eliminado`);
-    setDeleteTarget(null);
+    try {
+      await api.delete(`/productos/${deleteTarget.id}`);
+      toast.success(`Producto "${deleteTarget.name}" eliminado`);
+      setDeleteTarget(null);
+      await fetchProductos();
+    } catch {
+      toast.error("Error al eliminar el producto");
+    }
     setDeleting(false);
-    await fetchProductos();
   };
 
   return (

@@ -27,7 +27,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { supabase, type Profile } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import { type Profile } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserPlus, Trash2 } from "lucide-react";
 
@@ -60,14 +61,14 @@ export default function Configuracion() {
 
   useEffect(() => {
     async function fetchConfig() {
-      const { data } = await supabase.from("configuracion").select("*").eq("id", 1).maybeSingle();
+      const data = await api.get<any>("/configuracion");
       if (data) {
         setForm({
-          company_name: data.company_name,
-          company_rut: data.company_rut,
-          tickets_url: data.tickets_url ?? "",
-          ticketera_email: data.ticketera_email ?? "",
-          ticketera_password: data.ticketera_password ?? "",
+          company_name: data.companyName ?? data.company_name ?? "",
+          company_rut: data.companyRut ?? data.company_rut ?? "",
+          tickets_url: data.ticketsUrl ?? data.tickets_url ?? "",
+          ticketera_email: data.ticketeraEmail ?? data.ticketera_email ?? "",
+          ticketera_password: data.ticketeraPassword ?? data.ticketera_password ?? "",
         });
       }
     }
@@ -81,20 +82,18 @@ export default function Configuracion() {
 
   async function fetchProfiles() {
     setLoadingUsers(true);
-    const { data } = await supabase.from("profiles").select("*").order("created_at");
-    if (data) setProfiles(data as Profile[]);
+    const data = await api.get<Profile[]>("/auth/usuarios");
+    setProfiles(data);
     setLoadingUsers(false);
   }
 
   const handleSave = async () => {
     setSaving(true);
-    const { error } = await supabase
-      .from("configuracion")
-      .upsert({ id: 1, ...form, updated_at: new Date().toISOString() });
-    if (error) {
-      toast.error("Error al guardar la configuración");
-    } else {
+    try {
+      await api.put("/configuracion", form);
       toast.success("Configuración guardada correctamente");
+    } catch {
+      toast.error("Error al guardar la configuración");
     }
     setSaving(false);
   };
@@ -105,52 +104,36 @@ export default function Configuracion() {
       return;
     }
     setCreatingUser(true);
-
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: newUser.email,
-      password: newUser.password,
-      options: { data: { full_name: newUser.full_name } },
-    });
-
-    if (signUpError) {
-      toast.error(signUpError.message);
-      setCreatingUser(false);
-      return;
+    try {
+      await api.post("/auth/register", newUser);
+      toast.success(`Usuario ${newUser.email} creado correctamente`);
+      setShowCreateUser(false);
+      setNewUser({ email: "", password: "", full_name: "", role: "comercial" });
+      fetchProfiles();
+    } catch (e: any) {
+      toast.error(e.message ?? "Error al crear usuario");
     }
-
-    if (signUpData.user) {
-      await new Promise((r) => setTimeout(r, 800));
-      await supabase
-        .from("profiles")
-        .update({ role: newUser.role, full_name: newUser.full_name })
-        .eq("id", signUpData.user.id);
-    }
-
-    toast.success(`Usuario ${newUser.email} creado correctamente`);
-    setShowCreateUser(false);
-    setNewUser({ email: "", password: "", full_name: "", role: "comercial" });
-    fetchProfiles();
     setCreatingUser(false);
   };
 
   const handleChangeRole = async (userId: string, role: "admin" | "comercial") => {
-    const { error } = await supabase.from("profiles").update({ role }).eq("id", userId);
-    if (error) {
-      toast.error("Error al cambiar el rol");
-    } else {
+    try {
+      await api.put(`/auth/usuarios/${userId}`, { role });
       toast.success("Rol actualizado");
       fetchProfiles();
+    } catch {
+      toast.error("Error al cambiar el rol");
     }
   };
 
   const handleDeleteUser = async (userId: string, email: string) => {
     if (!confirm(`¿Eliminar al usuario ${email}?`)) return;
-    const { error } = await supabase.from("profiles").delete().eq("id", userId);
-    if (error) {
-      toast.error("Error al eliminar usuario");
-    } else {
+    try {
+      await api.delete(`/auth/usuarios/${userId}`);
       toast.success("Usuario eliminado");
       fetchProfiles();
+    } catch {
+      toast.error("Error al eliminar usuario");
     }
   };
 
