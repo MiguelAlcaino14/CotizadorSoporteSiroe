@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { FileText, Image, File } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { supabase, type Documento } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import { type Documento } from "@/lib/supabase";
 
 const typeColors: Record<string, string> = {
   Aprobación: "bg-success/10 text-success border-success/20",
@@ -21,11 +22,8 @@ export default function Documentos() {
 
   useEffect(() => {
     async function fetchDocs() {
-      const { data } = await supabase
-        .from("documentos")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (data) setDocs(data);
+      const data = await api.get<Documento[]>("/documentos");
+      setDocs(data);
       setLoading(false);
     }
     fetchDocs();

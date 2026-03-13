@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Outlet, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 
 const WARN_DAYS = 3;
 
@@ -22,25 +22,20 @@ export function AppLayout() {
 
   useEffect(() => {
     async function fetchExpiring() {
-      const { data } = await supabase
-        .from("cotizaciones")
-        .select("id, validity_days, created_at, clientes(name)")
-        .not("validity_days", "is", null);
-
-      if (!data) return;
-
+      const data = await api.get<any[]>("/cotizaciones").catch(() => []);
       const now = new Date();
       const result: ExpiringCot[] = [];
 
       for (const cot of data) {
-        const createdAt = new Date(cot.created_at);
+        const validityDays = cot.validityDays ?? cot.validity_days ?? 30;
+        const createdAt = new Date(cot.createdAt ?? cot.created_at);
         const validUntil = new Date(createdAt);
-        validUntil.setDate(validUntil.getDate() + (cot.validity_days ?? 30));
+        validUntil.setDate(validUntil.getDate() + validityDays);
         const daysLeft = Math.ceil((validUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         if (daysLeft > 0 && daysLeft <= WARN_DAYS) {
           result.push({
             id: cot.id,
-            clientName: (cot.clientes as any)?.name ?? "-",
+            clientName: cot.clientes?.name ?? cot.cliente?.name ?? "-",
             daysLeft,
           });
         }

@@ -14,7 +14,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import type { DateRange } from "react-day-picker";
-import { supabase, type Producto } from "@/lib/supabase";
+import { api } from "@/lib/api";
+import { type Producto } from "@/lib/supabase";
 
 const PRODUCT_CATEGORIES = ["Servicio", "Arriendo de Equipos", "Producto", "Licencia / Software"] as const;
 
@@ -93,9 +94,9 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
   const hasUFItems = items.some((i) => i.currency === "UF");
 
   React.useEffect(() => {
-    supabase.from("productos").select("*").order("name").then(({ data }) => {
-      if (data) setProductos(data as Producto[]);
-    });
+    api.get<any[]>("/productos").then((data) => {
+      setProductos(data.map((p) => ({ ...p, unit_price: p.unitPrice ?? p.unit_price })));
+    }).catch(() => {});
   }, []);
 
   const handleServiceChange = (itemId: string | number, value: string) => {

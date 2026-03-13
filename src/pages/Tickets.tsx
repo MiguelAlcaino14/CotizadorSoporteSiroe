@@ -3,7 +3,7 @@ import { Search, Ticket, AlertTriangle, RefreshCw, ExternalLink } from "lucide-r
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { api } from "@/lib/api";
 import { getToken, fetchTickets, clearToken, type TicketeraTicket } from "@/lib/ticketeraApi";
 import { toast } from "sonner";
 
@@ -55,19 +55,16 @@ export default function Tickets() {
 
   // Load credentials from configuracion
   useEffect(() => {
-    supabase
-      .from("configuracion")
-      .select("ticketera_email, ticketera_password")
-      .eq("id", 1)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.ticketera_email && data?.ticketera_password) {
-          setCreds({ email: data.ticketera_email, password: data.ticketera_password });
-        } else {
-          setNoConfig(true);
-          setLoading(false);
-        }
-      });
+    api.get<any>("/configuracion").then((data) => {
+      const email = data?.ticketeraEmail ?? data?.ticketera_email;
+      const password = data?.ticketeraPassword ?? data?.ticketera_password;
+      if (email && password) {
+        setCreds({ email, password });
+      } else {
+        setNoConfig(true);
+        setLoading(false);
+      }
+    }).catch(() => { setNoConfig(true); setLoading(false); });
   }, []);
 
   const loadTickets = useCallback(async () => {
