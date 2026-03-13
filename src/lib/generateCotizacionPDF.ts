@@ -2,13 +2,33 @@ import jsPDF from "jspdf";
 import type { Cliente } from "@/lib/supabase";
 
 interface LineItem {
-  id: number;
+  id: number | string;
   service: string;
   description: string;
   quantity: number;
   unitPrice: number;
   currency: "CLP" | "UF";
+  category?: string;
+  rentalPeriod?: string;
+  rentalFrom?: Date | null;
+  rentalTo?: Date | null;
 }
+
+function fmtDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+const TRANSFER_DATA = {
+  banco: "Santander",
+  tipoCuenta: "Cuenta Corriente",
+  numeroCuenta: "97713421",
+  rut: "78.144.127-9",
+  titular: "Soporte Siroe SPA",
+  email: "administracion@soportesiroe.cl",
+};
 
 interface GeneratePDFOptions {
   cotizacionId: string;
@@ -20,19 +40,44 @@ interface GeneratePDFOptions {
   netTotal: number;
   ivaAmount: number;
   grandTotal: number;
+  version?: number;
+  validityDays?: number;
+  terms?: string;
+  requesterName?: string;
 }
 
-export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
-  const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal } = opts;
+async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+    return { dataUrl, width, height };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<void> {
+  const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal, validityDays = 30, terms, requesterName } = opts;
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   const pageW = 210;
   const margin = 16;
   const contentW = pageW - margin * 2;
-  const today = new Date().toLocaleDateString("es-CL");
 
   const colors = {
-    primary: [30, 64, 175] as [number, number, number],
+    primary: [76, 34, 77] as [number, number, number],
     text: [17, 24, 39] as [number, number, number],
     muted: [107, 114, 128] as [number, number, number],
     border: [229, 231, 235] as [number, number, number],
@@ -41,91 +86,119 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     white: [255, 255, 255] as [number, number, number],
   };
 
+  const logoDataUrl = await loadImageAsDataUrl("/Logo_Siroe_opc_2_B.png");
+
   let y = margin;
 
+  const gap = 4;
+  const clientColW = (contentW - gap) / 2;
+  const quoteColW = clientColW;
+  const quoteX = margin + clientColW + gap;
+
+  // Banda de encabezado: logo (izquierda) + título/ID (derecha)
+  const headerH = 32;
+  const logoW = clientColW;
+  const logoH = logoDataUrl ? logoW * (logoDataUrl.height / logoDataUrl.width) : 14;
+  const logoY = (headerH - logoH) / 2;
   doc.setFillColor(...colors.primary);
-  doc.rect(0, 0, pageW, 28, "F");
+  doc.rect(0, 0, pageW, headerH, "F");
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl.dataUrl, "PNG", margin, logoY, logoW, logoH);
+  }
 
   doc.setTextColor(...colors.white);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.text("COTIZACIÓN", margin, 12);
-
+  doc.text("COTIZACIÓN", pageW - margin, 13, { align: "right" });
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(cotizacionId, margin, 20);
+  doc.text(cotizacionId, pageW - margin, 22, { align: "right" });
 
-  doc.setFontSize(9);
-  doc.text(`Fecha: ${today}`, pageW - margin, 10, { align: "right" });
-  doc.text("Estado: Borrador  |  Versión: v1", pageW - margin, 16, { align: "right" });
-  if (requirement) {
-    doc.text(`Requerimiento: ${requirement}`, pageW - margin, 22, { align: "right" });
-  }
+  y = headerH + 8;
 
-  y = 36;
-
-  const colMid = margin + contentW / 2 + 4;
-
-  doc.setFillColor(...colors.headerBg);
-  doc.roundedRect(margin, y, contentW / 2 - 4, 6, 1, 1, "F");
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...colors.muted);
-  doc.text("CLIENTE", margin + 3, y + 4);
-
-  doc.setFillColor(...colors.headerBg);
-  doc.roundedRect(colMid, y, contentW / 2 - 4, 6, 1, 1, "F");
-  doc.text("COTIZACIÓN", colMid + 3, y + 4);
-
-  y += 9;
-
+  // Datos para calcular la altura total de la sección de info
+  const hasUF = items.some((i) => i.currency === "UF");
   const infoRows: [string, string][] = [
     ["Empresa", cliente.name],
     ["RUT", cliente.rut],
     ["Email", cliente.email || "-"],
     ["Teléfono", cliente.phone || "-"],
+    ["Solicitado por", requesterName || "-"],
   ];
+  // Períodos de arriendo únicos para mostrar en panel COTIZACIÓN
+  const rentalItemsWithDates = items.filter(
+    (i) => i.category === "Arriendo de Equipos" && i.rentalFrom && i.rentalTo
+  );
+  const seenRanges = new Map<string, { from: Date; to: Date; label: string }>();
+  rentalItemsWithDates.forEach((item) => {
+    const key = `${item.rentalFrom!.toISOString()}_${item.rentalTo!.toISOString()}`;
+    if (!seenRanges.has(key)) {
+      seenRanges.set(key, { from: item.rentalFrom!, to: item.rentalTo!, label: item.service });
+    }
+  });
+  const rentalDateRows: [string, string][] = [...seenRanges.values()].map(({ from, to, label }, i) => [
+    seenRanges.size === 1 ? "Período arriendo" : `Arriendo ${i + 1}`,
+    `${fmtDate(from)} - ${fmtDate(to)}`,
+  ]);
 
-  const hasUF = items.some((i) => i.currency === "UF");
   const quoteRows: [string, string][] = [
     ["Ejecutivo", executive],
     ["Moneda", hasUF ? "CLP / UF" : "CLP"],
     ...(hasUF && ufValue > 0 ? [["Valor UF", `$${ufValue.toLocaleString("es-CL")}`] as [string, string]] : []),
-    ["Validez", "5 días desde emisión"],
+    ["Validez", `${validityDays} día${validityDays !== 1 ? "s" : ""} desde emisión`],
+    ...rentalDateRows,
   ];
 
   const rowH = 5.5;
+  const badgeH = 6;
+  const infoSectionH = badgeH + 3 + Math.max(infoRows.length, quoteRows.length) * rowH;
+
+  // Badge CLIENTE (alineado con logo del header)
+  doc.setFillColor(...colors.headerBg);
+  doc.roundedRect(margin, y, clientColW, badgeH, 1, 1, "F");
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...colors.muted);
+  doc.text("CLIENTE", margin + 3, y + 4);
+
+  // Badge COTIZACIÓN
+  doc.setFillColor(...colors.headerBg);
+  doc.roundedRect(quoteX, y, quoteColW, badgeH, 1, 1, "F");
+  doc.text("COTIZACIÓN", quoteX + 3, y + 4);
+
+  const infoStartY = y + badgeH + 3;
+
   infoRows.forEach(([label, value], i) => {
-    const rowY = y + i * rowH;
+    const rowY = infoStartY + i * rowH;
     if (i % 2 === 0) {
       doc.setFillColor(252, 252, 253);
-      doc.rect(margin, rowY - 1, contentW / 2 - 4, rowH, "F");
+      doc.rect(margin, rowY - 1, clientColW, rowH, "F");
     }
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...colors.muted);
     doc.text(label, margin + 2, rowY + 3);
     doc.setTextColor(...colors.text);
-    const maxW = contentW / 2 - 40;
-    const truncated = doc.getTextWidth(value) > maxW ? value.substring(0, 30) + "..." : value;
-    doc.text(truncated, margin + contentW / 2 - 8, rowY + 3, { align: "right" });
+    const truncated = doc.getTextWidth(value) > clientColW - 22 ? value.substring(0, 26) + "..." : value;
+    doc.text(truncated, margin + clientColW - 2, rowY + 3, { align: "right" });
   });
 
   quoteRows.forEach(([label, value], i) => {
-    const rowY = y + i * rowH;
+    const rowY = infoStartY + i * rowH;
     if (i % 2 === 0) {
       doc.setFillColor(252, 252, 253);
-      doc.rect(colMid, rowY - 1, contentW / 2 - 4, rowH, "F");
+      doc.rect(quoteX, rowY - 1, quoteColW, rowH, "F");
     }
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...colors.muted);
-    doc.text(label, colMid + 2, rowY + 3);
+    doc.text(label, quoteX + 2, rowY + 3);
     doc.setTextColor(...colors.text);
-    doc.text(value, colMid + contentW / 2 - 8, rowY + 3, { align: "right" });
+    doc.text(value, quoteX + quoteColW - 2, rowY + 3, { align: "right" });
   });
 
-  y += Math.max(infoRows.length, quoteRows.length) * rowH + 10;
+  y += infoSectionH + 10;
 
   doc.setFillColor(...colors.headerBg);
   doc.roundedRect(margin, y, contentW, 6, 1, 1, "F");
@@ -153,48 +226,87 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
   });
   y += 7;
 
-  items.forEach((item, idx) => {
-    const rawTotal = item.quantity * item.unitPrice;
-    const clpTotal = item.currency === "UF" ? rawTotal * ufValue : rawTotal;
-    const cellH = 7;
-
-    if (idx % 2 === 0) {
-      doc.setFillColor(...colors.white);
-    } else {
-      doc.setFillColor(...colors.rowAlt);
-    }
-    doc.rect(margin, y, contentW, cellH, "F");
-
-    const unitDisplay = item.currency === "UF"
-      ? `UF ${item.unitPrice.toLocaleString("es-CL")}`
-      : `$${item.unitPrice.toLocaleString("es-CL")}`;
-
-    const values = [
-      item.service,
-      item.description,
-      String(item.quantity),
-      item.currency,
-      unitDisplay,
-      `$${Math.round(clpTotal).toLocaleString("es-CL")}`,
-    ];
-
-    let cx = margin;
-    values.forEach((val, i) => {
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...colors.text);
-      const maxChars = Math.floor(colWidths[i] / 2.2);
-      const truncated = val.length > maxChars ? val.substring(0, maxChars - 1) + "…" : val;
-      const x = colAligns[i] === "right" ? cx + colWidths[i] - 2 : cx + 2;
-      doc.text(truncated, x, y + 4.5, { align: colAligns[i] });
-      cx += colWidths[i];
-    });
-
-    doc.setDrawColor(...colors.border);
-    doc.setLineWidth(0.2);
-    doc.line(margin, y + cellH, margin + contentW, y + cellH);
-    y += cellH;
+  // Agrupar items por categoría
+  const categoryOrder = ["Servicio", "Producto", "Licencia / Software", "Arriendo de Equipos"];
+  const groupedMap = new Map<string, LineItem[]>();
+  for (const item of items) {
+    const cat = item.category || "Servicio";
+    if (!groupedMap.has(cat)) groupedMap.set(cat, []);
+    groupedMap.get(cat)!.push(item);
+  }
+  const sortedCategories = [...groupedMap.keys()].sort((a, b) => {
+    const ai = categoryOrder.indexOf(a);
+    const bi = categoryOrder.indexOf(b);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
+  const multipleGroups = groupedMap.size > 1;
+
+  let rowIdx = 0;
+  for (const cat of sortedCategories) {
+    const catItems = groupedMap.get(cat)!;
+
+    if (multipleGroups) {
+      doc.setFillColor(220, 210, 230);
+      doc.rect(margin, y, contentW, 6, "F");
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...colors.primary);
+      doc.text(cat.toUpperCase(), margin + 3, y + 4);
+      y += 6;
+    }
+
+    for (const item of catItems) {
+      const rawTotal = item.quantity * item.unitPrice;
+      const clpTotal = item.currency === "UF" ? rawTotal * ufValue : rawTotal;
+      const hasRentalPeriod = item.category === "Arriendo de Equipos" && !!item.rentalPeriod;
+      const cellH = hasRentalPeriod ? 11 : 7;
+
+      if (rowIdx % 2 === 0) {
+        doc.setFillColor(...colors.white);
+      } else {
+        doc.setFillColor(...colors.rowAlt);
+      }
+      doc.rect(margin, y, contentW, cellH, "F");
+
+      const unitDisplay = item.currency === "UF"
+        ? `UF ${item.unitPrice.toLocaleString("es-CL")}`
+        : `$${item.unitPrice.toLocaleString("es-CL")}`;
+
+      const values = [
+        item.service,
+        item.description,
+        String(item.quantity),
+        item.currency,
+        unitDisplay,
+        `$${Math.round(clpTotal).toLocaleString("es-CL")}`,
+      ];
+
+      let cx = margin;
+      values.forEach((val, i) => {
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...colors.text);
+        const maxChars = Math.floor(colWidths[i] / 2.2);
+        const truncated = val.length > maxChars ? val.substring(0, maxChars - 1) + "…" : val;
+        const x = colAligns[i] === "right" ? cx + colWidths[i] - 2 : cx + 2;
+        doc.text(truncated, x, y + 4.5, { align: colAligns[i] });
+        cx += colWidths[i];
+      });
+
+      if (hasRentalPeriod) {
+        doc.setFontSize(6.5);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(...colors.muted);
+        doc.text(`Período: ${item.rentalPeriod}`, margin + 2, y + cellH - 2);
+      }
+
+      doc.setDrawColor(...colors.border);
+      doc.setLineWidth(0.2);
+      doc.line(margin, y + cellH, margin + contentW, y + cellH);
+      y += cellH;
+      rowIdx++;
+    }
+  }
 
   y += 2;
 
@@ -203,13 +315,15 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
     ["IVA (19%)", `$${Math.round(ivaAmount).toLocaleString("es-CL")}`],
   ];
 
+  const summaryStartX = margin + 132;
+  const summaryWidth = contentW - 132;
   summaryRows.forEach(([label, value]) => {
     doc.setFillColor(...colors.white);
-    doc.rect(margin + contentW - 60, y, 60, 6, "F");
+    doc.rect(summaryStartX, y, summaryWidth, 6, "F");
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...colors.muted);
-    doc.text(label, margin + contentW - 32, y + 4);
+    doc.text(label, summaryStartX + 2, y + 4);
     doc.setTextColor(...colors.text);
     doc.text(value, margin + contentW - 2, y + 4, { align: "right" });
     y += 6;
@@ -217,14 +331,83 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
 
   y += 1;
   doc.setFillColor(...colors.primary);
-  doc.rect(margin + contentW - 60, y, 60, 9, "F");
+  doc.rect(summaryStartX, y, summaryWidth, 9, "F");
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...colors.white);
-  doc.text("Total", margin + contentW - 32, y + 6);
+  doc.text("Total", summaryStartX + 2, y + 6);
   doc.setFontSize(9);
   doc.text(`$${Math.round(grandTotal).toLocaleString("es-CL")}`, margin + contentW - 2, y + 6, { align: "right" });
   y += 15;
+
+  y += 4;
+
+  // Transferencia y términos lado a lado; términos solo si se ingresaron
+  const VALIDITY_TERM = `Válido por ${validityDays} día${validityDays !== 1 ? "s" : ""} desde la fecha de emisión.`;
+  const FIXED_TERMS = "Todos los valores expresados en UF serán calculados de acuerdo con el valor de la UF vigente al momento de la emisión de la factura.";
+  const userTerms = terms?.trim() ?? "";
+
+  const transferW = contentW / 2 - 2;
+  const termsW = contentW / 2 - 2;
+  const termsX = margin + contentW / 2 + 2;
+  const sectionHeaderH = 6;
+
+  doc.setFillColor(...colors.headerBg);
+  doc.roundedRect(margin, y, transferW, sectionHeaderH, 1, 1, "F");
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...colors.muted);
+  doc.text("DATOS DE TRANSFERENCIA", margin + 3, y + 4);
+
+  doc.setFillColor(...colors.headerBg);
+  doc.roundedRect(termsX, y, termsW, sectionHeaderH, 1, 1, "F");
+  doc.text("TÉRMINOS Y CONDICIONES", termsX + 3, y + 4);
+
+  y += sectionHeaderH + 1;
+
+  const transferRows: [string, string][] = [
+    ["Banco", TRANSFER_DATA.banco],
+    ["Tipo de cuenta", TRANSFER_DATA.tipoCuenta],
+    ["N° de cuenta", TRANSFER_DATA.numeroCuenta],
+    ["RUT", TRANSFER_DATA.rut],
+    ["Titular", TRANSFER_DATA.titular],
+    ["Email", TRANSFER_DATA.email],
+  ];
+
+  const tRowH = 5.5;
+  transferRows.forEach(([label, value], i) => {
+    const rowY = y + i * tRowH;
+    if (i % 2 === 0) {
+      doc.setFillColor(252, 252, 253);
+      doc.rect(margin, rowY - 1, transferW, tRowH, "F");
+    }
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...colors.muted);
+    doc.text(label, margin + 2, rowY + 3);
+    doc.setTextColor(...colors.text);
+    doc.text(value, margin + transferW - 2, rowY + 3, { align: "right" });
+  });
+
+  const termsBoxH = transferRows.length * tRowH + 2;
+  doc.setFillColor(252, 252, 253);
+  doc.rect(termsX, y - 1, termsW, termsBoxH, "F");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...colors.text);
+
+  // Línea 1: validez en negrita
+  doc.setFont("helvetica", "bold");
+  const wrappedValidity = doc.splitTextToSize(VALIDITY_TERM, termsW - 4);
+  doc.text(wrappedValidity, termsX + 2, y + 3);
+
+  // Línea 2: texto fijo UF en normal
+  const validityBlockH = wrappedValidity.length * 3.5;
+  doc.setFont("helvetica", "normal");
+  const secondText = userTerms ? `${FIXED_TERMS}\n\n${userTerms}` : FIXED_TERMS;
+  const wrappedRest = doc.splitTextToSize(secondText, termsW - 4);
+  doc.text(wrappedRest, termsX + 2, y + 3 + validityBlockH + 1);
+
+  y += transferRows.length * tRowH + 8;
 
   doc.setDrawColor(...colors.border);
   doc.setLineWidth(0.3);
@@ -235,7 +418,7 @@ export function generateCotizacionPDF(opts: GeneratePDFOptions): void {
   doc.setFont("helvetica", "italic");
   doc.setTextColor(...colors.muted);
   doc.text(
-    "Este documento es una cotización comercial y no constituye una factura. Válido por 5 días desde la fecha de emisión.",
+    "Este documento es una cotización comercial y no constituye una factura.",
     pageW / 2,
     y,
     { align: "center" }

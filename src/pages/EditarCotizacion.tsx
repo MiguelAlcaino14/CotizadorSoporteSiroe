@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Loader as Loader2 } from "lucide-react";
+import { ArrowLeft, FileDown, Loader as Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,12 +15,16 @@ import {
 import { toast } from "sonner";
 import { supabase, getAppConfigs, type Cliente, type CotizacionItem } from "@/lib/supabase";
 import CotizacionItemsEditor, { type LineItem } from "@/components/CotizacionItemsEditor";
+import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 
 export default function EditarCotizacion() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [version, setVersion] = useState(1);
+  const [validityDays, setValidityDays] = useState(30);
 
   const [clientId, setClientId] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -30,6 +35,7 @@ export default function EditarCotizacion() {
   const [requesterName, setRequesterName] = useState("");
   const [status, setStatus] = useState("");
   const [ufValue, setUfValue] = useState<number>(0);
+  const [terms, setTerms] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
@@ -50,7 +56,10 @@ export default function EditarCotizacion() {
         setRequirement(cotRes.data.requirement ?? "");
         setRequesterName(cotRes.data.requester_name ?? "");
         setStatus(cotRes.data.status);
+        setVersion(cotRes.data.version ?? 1);
+        setValidityDays(cotRes.data.validity_days ?? 30);
         if (cotRes.data.uf_value) setUfValue(cotRes.data.uf_value);
+        setTerms(cotRes.data.terms ?? "");
       }
       if (itemsRes.data) {
         setItems(
@@ -61,6 +70,10 @@ export default function EditarCotizacion() {
             quantity: i.quantity,
             unitPrice: i.unit_price,
             currency: (i.currency as "CLP" | "UF") ?? "CLP",
+            category: i.category || "Servicio",
+            rentalPeriod: i.rental_period || "",
+            rentalFrom: i.rental_from ? new Date(i.rental_from + "T12:00:00") : null,
+            rentalTo: i.rental_to ? new Date(i.rental_to + "T12:00:00") : null,
           }))
         );
       }
@@ -78,6 +91,41 @@ export default function EditarCotizacion() {
       setDeletedItemIds((prev) => [...prev, ...removedIds]);
     }
     setItems(newItems);
+  };
+
+  const handleGenerarPDF = async () => {
+    const selectedCliente = clientes.find((c) => c.id === clientId);
+    if (!selectedCliente) { toast.error("Selecciona un cliente antes de generar el PDF"); return; }
+    const hasUF = items.some((i) => i.currency === "UF");
+    if (hasUF && ufValue <= 0) { toast.error("Ingresa el valor de la UF para generar el PDF"); return; }
+    setGeneratingPDF(true);
+    try {
+      const netTotal = items.reduce((sum, i) => {
+        const base = i.quantity * i.unitPrice;
+        return sum + (i.currency === "UF" ? base * ufValue : base);
+      }, 0);
+      const ivaAmount = netTotal * 0.19;
+      await generateCotizacionPDF({
+        cotizacionId: id!,
+        cliente: selectedCliente,
+        executive,
+        requirement,
+        items,
+        ufValue,
+        netTotal,
+        ivaAmount,
+        grandTotal: netTotal + ivaAmount,
+        version,
+        validityDays,
+        terms,
+        requesterName,
+      });
+      toast.success(`PDF ${id} v${version} descargado`);
+    } catch {
+      toast.error("Error al generar el PDF");
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,6 +156,7 @@ export default function EditarCotizacion() {
         status,
         currency: hasUF ? "MIXTO" : "CLP",
         uf_value: hasUF ? ufValue : null,
+        terms: terms.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
@@ -134,6 +183,10 @@ export default function EditarCotizacion() {
           quantity: i.quantity,
           unit_price: i.unitPrice,
           currency: i.currency,
+          category: i.category || "Servicio",
+          rental_period: i.rentalPeriod || null,
+          rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
+          rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
         }))
       );
     }
@@ -147,6 +200,10 @@ export default function EditarCotizacion() {
           quantity: item.quantity,
           unit_price: item.unitPrice,
           currency: item.currency,
+          category: item.category || "Servicio",
+          rental_period: item.rentalPeriod || null,
+          rental_from: item.rentalFrom ? item.rentalFrom.toISOString().split("T")[0] : null,
+          rental_to: item.rentalTo ? item.rentalTo.toISOString().split("T")[0] : null,
         })
         .eq("id", item.id);
     }
@@ -263,9 +320,25 @@ export default function EditarCotizacion() {
           />
         </div>
 
+        <div className="bg-card rounded-xl border shadow-sm p-6 space-y-2">
+          <Label htmlFor="terms">Términos y Condiciones <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Textarea
+            id="terms"
+            placeholder="Ej: El precio no incluye instalación. Tiempo de entrega: 10 días hábiles..."
+            rows={4}
+            value={terms}
+            onChange={(e) => setTerms(e.target.value)}
+            className="resize-y"
+          />
+        </div>
+
         <div className="flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => navigate(`/cotizaciones/${id}`)}>
             Cancelar
+          </Button>
+          <Button type="button" variant="outline" className="gap-2" onClick={handleGenerarPDF} disabled={generatingPDF}>
+            {generatingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            {generatingPDF ? "Generando..." : "Generar PDF"}
           </Button>
           <Button type="submit" disabled={saving}>
             {saving ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Guardando...</> : "Guardar Cambios"}

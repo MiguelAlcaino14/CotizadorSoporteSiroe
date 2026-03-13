@@ -25,6 +25,7 @@ export type Cotizacion = {
   requester_name: string | null;
   version: number;
   uf_value: number | null;
+  validity_days: number;
   created_at: string;
   updated_at: string;
   clientes?: Cliente;
@@ -38,6 +39,10 @@ export type CotizacionItem = {
   quantity: number;
   unit_price: number;
   currency: string;
+  category: string;
+  rental_period: string | null;
+  rental_from: string | null;
+  rental_to: string | null;
   created_at: string;
 };
 
@@ -79,6 +84,8 @@ export type Configuracion = {
   company_name: string;
   company_rut: string;
   tickets_url: string;
+  ticketera_email: string | null;
+  ticketera_password: string | null;
   updated_at: string;
 };
 
@@ -87,6 +94,16 @@ export type Profile = {
   email: string;
   role: "admin" | "comercial";
   full_name: string;
+  created_at: string;
+};
+
+export type Producto = {
+  id: string;
+  name: string;
+  description: string;
+  unit_price: number;
+  currency: "CLP" | "UF";
+  category: string;
   created_at: string;
 };
 

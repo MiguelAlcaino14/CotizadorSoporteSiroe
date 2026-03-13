@@ -5,6 +5,7 @@ import { ArrowLeft, Info, UserPlus, FileDown, Loader as Loader2 } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ export default function NuevaCotizacion() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [customId, setCustomId] = useState("");
+  const [validityDays, setValidityDays] = useState(30);
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [ufValue, setUfValue] = useState<number>(0);
@@ -61,8 +63,9 @@ export default function NuevaCotizacion() {
     phone: "",
     address: "",
   });
+  const [terms, setTerms] = useState("");
   const [items, setItems] = useState<LineItem[]>([
-    { id: 1, service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP" },
+    { id: 1, service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP", category: "Servicio", rentalPeriod: "" },
   ]);
 
   useEffect(() => {
@@ -122,7 +125,7 @@ export default function NuevaCotizacion() {
     setSavingCliente(false);
   };
 
-  const handleGenerarPDF = () => {
+  const handleGenerarPDF = async () => {
     if (!clientId || !selectedCliente) {
       toast.error("Selecciona un cliente antes de generar el PDF");
       return;
@@ -133,7 +136,7 @@ export default function NuevaCotizacion() {
     }
     setGeneratingPDF(true);
     try {
-      generateCotizacionPDF({
+      await generateCotizacionPDF({
         cotizacionId: customId.trim() || nextId,
         cliente: selectedCliente,
         executive,
@@ -143,6 +146,8 @@ export default function NuevaCotizacion() {
         netTotal,
         ivaAmount,
         grandTotal,
+        terms,
+        requesterName,
       });
       toast.success(`PDF ${customId.trim() || nextId}.pdf descargado`);
     } catch {
@@ -183,6 +188,8 @@ export default function NuevaCotizacion() {
       requester_name: requesterName.trim() || null,
       version: 1,
       uf_value: hasUFItems ? ufValue : null,
+      validity_days: validityDays,
+      terms: terms.trim() || null,
     });
 
     if (cotError) {
@@ -198,6 +205,10 @@ export default function NuevaCotizacion() {
       quantity: i.quantity,
       unit_price: i.unitPrice,
       currency: i.currency,
+      category: i.category || "Servicio",
+      rental_period: i.rentalPeriod || null,
+      rental_from: i.rentalFrom ? i.rentalFrom.toISOString().split("T")[0] : null,
+      rental_to: i.rentalTo ? i.rentalTo.toISOString().split("T")[0] : null,
     }));
 
     const { error: itemsError } = await supabase.from("cotizacion_items").insert(itemsToInsert);
@@ -298,6 +309,16 @@ export default function NuevaCotizacion() {
               <Label>Ejecutivo responsable</Label>
               <Input value={executive} readOnly className="bg-muted/40 cursor-default" />
             </div>
+            <div className="space-y-1.5">
+              <Label>Validez (días)</Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="30"
+                value={validityDays}
+                onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
           </div>
         </div>
 
@@ -310,9 +331,21 @@ export default function NuevaCotizacion() {
           />
         </div>
 
+        <div className="bg-card rounded-xl border shadow-sm p-6 space-y-2">
+          <Label htmlFor="terms">Términos y Condiciones <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Textarea
+            id="terms"
+            placeholder="Ej: El precio no incluye instalación. Tiempo de entrega: 10 días hábiles..."
+            rows={4}
+            value={terms}
+            onChange={(e) => setTerms(e.target.value)}
+            className="resize-y"
+          />
+        </div>
+
         <div className="flex items-start gap-2 p-4 rounded-lg bg-accent text-accent-foreground text-sm border border-primary/10">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
-          La validez de esta cotización es de 5 días desde la fecha de emisión. Los precios incluyen IVA (19%).
+          La validez de esta cotización es de {validityDays} día{validityDays !== 1 ? "s" : ""} desde la fecha de emisión. Los precios incluyen IVA (19%).
         </div>
 
         <div className="flex justify-end gap-3">

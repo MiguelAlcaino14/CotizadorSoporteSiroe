@@ -73,9 +73,11 @@ export default function Cotizaciones() {
 
   const filtered = quotes.filter((q) => {
     const clientName = q.clientes?.name ?? "";
+    const requirement = q.requirement ?? "";
     const matchesSearch =
       q.id.toLowerCase().includes(search.toLowerCase()) ||
-      clientName.toLowerCase().includes(search.toLowerCase());
+      clientName.toLowerCase().includes(search.toLowerCase()) ||
+      requirement.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === "all" || q.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -99,7 +101,7 @@ export default function Cotizaciones() {
         <div className="relative flex-1 sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por N° o cliente..."
+            placeholder="Buscar por N°, cliente o requerimiento..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -129,6 +131,7 @@ export default function Cotizaciones() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">N° Cotización</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cliente</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden md:table-cell">Ejecutivo</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">N° Req.</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Moneda</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Versión</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Estado</th>
@@ -155,6 +158,7 @@ export default function Cotizaciones() {
                     <td className="px-4 py-3 font-mono text-sm font-medium text-primary whitespace-nowrap">{q.id}</td>
                     <td className="px-4 py-3 text-sm text-foreground">{q.clientes?.name ?? "-"}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground hidden md:table-cell">{q.executive}</td>
+                    <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{q.requirement || "-"}</td>
                     <td className="px-4 py-3 text-sm font-medium text-foreground hidden sm:table-cell">{q.currency}</td>
                     <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">v{q.version}</td>
                     <td className="px-4 py-3">

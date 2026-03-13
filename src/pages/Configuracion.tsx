@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,21 @@ export default function Configuracion() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
 
-  const [form, setForm] = useState({ company_name: "Mi Empresa TI SpA", company_rut: "76.000.000-0", tickets_url: "" });
+  const [form, setForm] = useState({ company_name: "Mi Empresa TI SpA", company_rut: "76.000.000-0", tickets_url: "", ticketera_email: "", ticketera_password: "" });
+
+  const [notifications, setNotifications] = useState({
+    creacion_cotizacion: true,
+    aprobacion_cotizacion: true,
+    cierre_ticket: true,
+    subida_factura: true,
+  });
+
+  const notificationOptions = [
+    { key: "creacion_cotizacion", label: "Creación de cotización" },
+    { key: "aprobacion_cotizacion", label: "Aprobación de cotización" },
+    { key: "cierre_ticket", label: "Cierre de ticket" },
+    { key: "subida_factura", label: "Subida de factura" },
+  ] as const;
   const [saving, setSaving] = useState(false);
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -51,6 +66,8 @@ export default function Configuracion() {
           company_name: data.company_name,
           company_rut: data.company_rut,
           tickets_url: data.tickets_url ?? "",
+          ticketera_email: data.ticketera_email ?? "",
+          ticketera_password: data.ticketera_password ?? "",
         });
       }
     }
@@ -169,23 +186,49 @@ export default function Configuracion() {
 
         <div className="space-y-4">
           <h2 className="font-semibold text-foreground">Notificaciones</h2>
-          <p className="text-sm text-muted-foreground">
-            Las notificaciones se envían automáticamente para: creación, modificación, aprobación de cotización,
-            creación y cierre de tickets, subida de OC y factura.
-          </p>
+          <p className="text-sm text-muted-foreground">Selecciona los eventos para los que deseas recibir notificaciones.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {notificationOptions.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-3">
+                <Checkbox
+                  id={key}
+                  checked={notifications[key]}
+                  onCheckedChange={(checked) =>
+                    setNotifications((prev) => ({ ...prev, [key]: !!checked }))
+                  }
+                />
+                <Label htmlFor={key} className="text-sm font-normal cursor-pointer">{label}</Label>
+              </div>
+            ))}
+          </div>
         </div>
 
         <Separator />
 
         <div className="space-y-4">
-          <h2 className="font-semibold text-foreground">Integración Ticketera</h2>
-          <div className="space-y-1.5">
-            <Label>URL del sistema de tickets</Label>
-            <Input
-              placeholder="https://tickets.miempresa.cl/api"
-              value={form.tickets_url}
-              onChange={(e) => setForm({ ...form, tickets_url: e.target.value })}
-            />
+          <div>
+            <h2 className="font-semibold text-foreground">Integración Ticketera</h2>
+            <p className="text-sm text-muted-foreground mt-0.5">Credenciales para conectarse a <span className="font-medium">api-ticketera.siroe.cl</span></p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="usuario@soportesiroe.cl"
+                value={form.ticketera_email}
+                onChange={(e) => setForm({ ...form, ticketera_email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Contraseña</Label>
+              <Input
+                type="password"
+                placeholder="••••••••"
+                value={form.ticketera_password}
+                onChange={(e) => setForm({ ...form, ticketera_password: e.target.value })}
+              />
+            </div>
           </div>
         </div>
 

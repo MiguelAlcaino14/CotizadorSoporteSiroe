@@ -12,6 +12,9 @@ import NuevaCotizacion from "./pages/NuevaCotizacion";
 import DetalleCotizacion from "./pages/DetalleCotizacion";
 import EditarCotizacion from "./pages/EditarCotizacion";
 import Configuracion from "./pages/Configuracion";
+import Clientes from "./pages/Clientes";
+import Productos from "./pages/Productos";
+import Tickets from "./pages/Tickets";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -29,6 +32,9 @@ const App = () => (
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/cotizaciones" element={<Cotizaciones />} />
+            <Route path="/clientes" element={<Clientes />} />
+            <Route path="/productos" element={<Productos />} />
+            <Route path="/tickets" element={<Tickets />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
             <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
             <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/cotizaciones" />}>
