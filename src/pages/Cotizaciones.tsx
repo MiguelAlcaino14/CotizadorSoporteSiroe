@@ -223,7 +223,6 @@ export default function Cotizaciones() {
                         )}
                       </div>
                     </td>
-                    )}
                   </tr>
                 ))
               )}
