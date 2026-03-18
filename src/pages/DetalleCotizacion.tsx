@@ -32,11 +32,13 @@ type CotizacionFull = Cotizacion & {
 type ApiCotizacionFull = {
   id: string;
   clientId: string;
+  title: string;
   executive: string;
   currency: string;
   status: string;
   requirement: string;
   requesterName: string | null;
+  techDescription: string | null;
   version: number;
   ufValue: number | null;
   validityDays: number;
@@ -127,11 +129,13 @@ export default function DetalleCotizacion() {
           const mappedQuote: CotizacionFull = {
             id: data.id,
             client_id: data.clientId,
+            title: data.title ?? "",
             executive: data.executive,
             currency: data.currency,
             status: data.status,
             requirement: data.requirement,
             requester_name: data.requesterName,
+            tech_description: data.techDescription ?? null,
             version: data.version,
             uf_value: data.ufValue,
             validity_days: data.validityDays,
@@ -483,6 +487,27 @@ export default function DetalleCotizacion() {
               </table>
             </div>
           </div>
+
+          {/* Descripción para el técnico */}
+          {quote.tech_description && (
+            <div className="bg-card rounded-xl border shadow-sm p-6 space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-foreground">Descripción para el técnico</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => {
+                    navigator.clipboard.writeText(quote.tech_description!);
+                    toast.success("Descripción copiada al portapapeles");
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" /> Copiar
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.tech_description}</p>
+            </div>
+          )}
         </TabsContent>
 
         {/* ── TAB: VERSIONES ── */}

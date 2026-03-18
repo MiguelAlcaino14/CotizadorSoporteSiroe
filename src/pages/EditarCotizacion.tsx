@@ -31,6 +31,8 @@ import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 type ApiCotizacion = {
   id: string;
   clientId: string;
+  title: string;
+  techDescription: string | null;
   executive: string;
   currency: string;
   status: string;
@@ -70,6 +72,7 @@ export default function EditarCotizacion() {
 
   const [clientId, setClientId] = useState("");
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [title, setTitle] = useState("");
   const [executive, setExecutive] = useState("");
   const [executives, setExecutives] = useState<string[]>([]);
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -78,6 +81,7 @@ export default function EditarCotizacion() {
   const [status, setStatus] = useState("");
   const [ufValue, setUfValue] = useState<number>(0);
   const [terms, setTerms] = useState("");
+  const [techDescription, setTechDescription] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
 
@@ -94,6 +98,7 @@ export default function EditarCotizacion() {
         setStatuses(configs["statuses"] ?? []);
         if (cotData) {
           setClientId(cotData.clientId);
+          setTitle(cotData.title ?? "");
           setExecutive(cotData.executive);
           setRequirement(cotData.requirement ?? "");
           setRequesterName(cotData.requesterName ?? "");
@@ -102,6 +107,7 @@ export default function EditarCotizacion() {
           setValidityDays(cotData.validityDays ?? 30);
           if (cotData.ufValue) setUfValue(cotData.ufValue);
           setTerms(cotData.terms ?? "");
+          setTechDescription(cotData.techDescription ?? "");
           if (cotData.items) {
             setItems(
               cotData.items.map((i) => ({
@@ -187,6 +193,7 @@ export default function EditarCotizacion() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!title.trim()) { toast.error("El título de la cotización es requerido"); return; }
     if (!clientId) { toast.error("Selecciona un cliente"); return; }
     if (items.some((i) => !i.service.trim())) {
       toast.error("Completa el nombre del servicio en todos los ítems");
@@ -218,6 +225,8 @@ export default function EditarCotizacion() {
 
       await api.put(`/cotizaciones/${id}`, {
         client_id: clientId,
+        title: title.trim(),
+        tech_description: techDescription.trim() || null,
         executive,
         requirement,
         requester_name: requesterName.trim() || null,
@@ -286,6 +295,15 @@ export default function EditarCotizacion() {
 
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-foreground">Información de la Cotización</h2>
+          <div className="space-y-1.5">
+            <Label>Título <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="Ej: Servicio de soporte técnico mensual"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
@@ -349,6 +367,18 @@ export default function EditarCotizacion() {
             rows={4}
             value={terms}
             onChange={(e) => setTerms(e.target.value)}
+            className="resize-y"
+          />
+        </div>
+
+        <div className="bg-card rounded-xl border shadow-sm p-6 space-y-2">
+          <Label htmlFor="techDescription">Descripción para el técnico <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Textarea
+            id="techDescription"
+            placeholder="Ej: El cliente requiere instalación en horario nocturno. Coordinar con Carlos..."
+            rows={4}
+            value={techDescription}
+            onChange={(e) => setTechDescription(e.target.value)}
             className="resize-y"
           />
         </div>

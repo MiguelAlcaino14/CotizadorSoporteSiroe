@@ -54,6 +54,7 @@ function itemTotalCLP(item: LineItem, ufValue: number): number {
 export default function NuevaCotizacion() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const [title, setTitle] = useState("");
   const [executive, setExecutive] = useState("");
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
@@ -64,6 +65,10 @@ export default function NuevaCotizacion() {
   const [validityDays, setValidityDays] = useState(30);
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [showTechDescModal, setShowTechDescModal] = useState(false);
+  const [techDescription, setTechDescription] = useState("");
+  const [savingTechDesc, setSavingTechDesc] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [ufValue, setUfValue] = useState<number>(0);
   const [showNuevoClienteModal, setShowNuevoClienteModal] = useState(false);
   const [savingCliente, setSavingCliente] = useState(false);
@@ -203,6 +208,10 @@ export default function NuevaCotizacion() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!title.trim()) {
+      toast.error("El título de la cotización es requerido");
+      return;
+    }
     if (!clientId) {
       toast.error("Selecciona un cliente");
       return;
@@ -239,6 +248,7 @@ export default function NuevaCotizacion() {
       await api.post("/cotizaciones", {
         id: finalId,
         client_id: clientId,
+        title: title.trim(),
         executive,
         currency: hasUFItems ? "MIXTO" : "CLP",
         status: "Borrador",
@@ -252,12 +262,27 @@ export default function NuevaCotizacion() {
       });
 
       toast.success(`Cotización ${finalId} creada exitosamente`);
-      navigate("/cotizaciones");
+      setCreatedId(finalId);
+      setShowTechDescModal(true);
+      setSaving(false);
     } catch {
       toast.error("Error al crear la cotización");
       setSaving(false);
-      return;
     }
+  };
+
+  const handleSaveTechDesc = async () => {
+    if (!createdId) return;
+    setSavingTechDesc(true);
+    try {
+      await api.patch(`/cotizaciones/${createdId}/tech-description`, {
+        tech_description: techDescription.trim() || null,
+      });
+    } catch {
+      // No bloquea el flujo si falla
+    }
+    setSavingTechDesc(false);
+    navigate("/cotizaciones");
   };
 
   return (
@@ -313,6 +338,15 @@ export default function NuevaCotizacion() {
 
         <div className="bg-card rounded-xl border shadow-sm p-6 space-y-4">
           <h2 className="font-semibold text-foreground">Información de la Cotización</h2>
+          <div className="space-y-1.5">
+            <Label>Título <span className="text-destructive">*</span></Label>
+            <Input
+              placeholder="Ej: Servicio de soporte técnico mensual"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>ID de Cotización</Label>
@@ -441,6 +475,40 @@ export default function NuevaCotizacion() {
             </Button>
             <Button onClick={handleGuardarNuevoCliente} disabled={savingCliente}>
               {savingCliente ? "Guardando..." : "Crear Cliente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: descripción para el técnico */}
+      <Dialog open={showTechDescModal} onOpenChange={() => {}}>
+        <DialogContent className="max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Descripción para el técnico</DialogTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Puedes agregar notas internas para el equipo técnico. Este campo es opcional.
+            </p>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Ej: El cliente requiere instalación en horario nocturno. Coordinar con Carlos..."
+              rows={5}
+              value={techDescription}
+              onChange={(e) => setTechDescription(e.target.value)}
+              className="resize-y"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/cotizaciones")}
+              disabled={savingTechDesc}
+            >
+              Omitir
+            </Button>
+            <Button onClick={handleSaveTechDesc} disabled={savingTechDesc}>
+              {savingTechDesc ? "Guardando..." : "Guardar y continuar"}
             </Button>
           </DialogFooter>
         </DialogContent>

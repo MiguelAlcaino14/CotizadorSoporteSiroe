@@ -13,11 +13,13 @@ export type Cliente = {
 export type Cotizacion = {
   id: string;
   client_id: string;
+  title: string;
   executive: string;
   currency: string;
   status: string;
   requirement: string;
   requester_name: string | null;
+  tech_description: string | null;
   version: number;
   uf_value: number | null;
   validity_days: number;
@@ -50,6 +52,7 @@ export type CotizacionVersion = {
   items_snapshot: CotizacionItem[] | null;
   total: number | null;
   currency: string | null;
+  title: string | null;
   executive: string | null;
   requirement: string | null;
   requester_name: string | null;
