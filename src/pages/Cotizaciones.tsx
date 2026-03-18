@@ -123,12 +123,10 @@ export default function Cotizaciones() {
           <h1 className="page-header">Cotizaciones</h1>
           <p className="page-subheader">Gestiona todas las cotizaciones del sistema</p>
         </div>
-        {(
-          <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2 self-start sm:self-auto shrink-0">
-            <Plus className="h-4 w-4" />
-            Nueva Cotización
-          </Button>
-        )}
+        <Button onClick={() => navigate("/cotizaciones/nueva")} className="gap-2 self-start sm:self-auto shrink-0">
+          <Plus className="h-4 w-4" />
+          Nueva Cotización
+        </Button>
       </div>
 
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -211,16 +209,14 @@ export default function Cotizaciones() {
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteTarget(q)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(q)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>

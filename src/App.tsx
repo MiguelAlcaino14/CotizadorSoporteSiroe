@@ -37,8 +37,8 @@ const App = () => (
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
             <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
-            <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/cotizaciones" />}>
-              <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
+            <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
+            <Route element={<RoleRoute allowedRoles={["admin"]} redirectTo="/" />}>
               <Route path="/configuracion" element={<Configuracion />} />
             </Route>
           </Route>
