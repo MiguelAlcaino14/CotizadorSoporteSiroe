@@ -366,7 +366,7 @@ export default function NuevaCotizacion() {
             </div>
             <div className="space-y-1.5">
               <Label>Ejecutivo responsable</Label>
-              <Input value={executive} readOnly className="bg-muted/40 cursor-default" />
+              <Input value={executive} onChange={(e) => setExecutive(e.target.value)} placeholder="Nombre del ejecutivo" />
             </div>
             <div className="space-y-1.5">
               <Label>Validez (días)</Label>

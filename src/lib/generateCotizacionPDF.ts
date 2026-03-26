@@ -46,7 +46,7 @@ interface GeneratePDFOptions {
   requesterName?: string;
 }
 
-async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number } | null> {
+async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number; format: "PNG" | "JPEG" } | null> {
   try {
     const response = await fetch(url);
     const blob = await response.blob();
@@ -56,13 +56,40 @@ async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
-    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const { width, height, compressedDataUrl, hasTransparency } = await new Promise<{
+      width: number;
+      height: number;
+      compressedDataUrl: string;
+      hasTransparency: boolean;
+    }>((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0);
+        // Detect transparency by checking alpha channel
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let transparent = false;
+        for (let i = 3; i < imageData.data.length; i += 4) {
+          if (imageData.data[i] < 255) { transparent = true; break; }
+        }
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          compressedDataUrl: canvas.toDataURL("image/jpeg", 0.8),
+          hasTransparency: transparent,
+        });
+      };
       img.onerror = reject;
       img.src = dataUrl;
     });
-    return { dataUrl, width, height };
+    // Use JPEG (smaller) unless image has transparency
+    if (!hasTransparency) {
+      return { dataUrl: compressedDataUrl, width, height, format: "JPEG" };
+    }
+    return { dataUrl, width, height, format: "PNG" };
   } catch {
     return null;
   }
@@ -70,7 +97,7 @@ async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width
 
 export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<void> {
   const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal, validityDays = 30, terms, requesterName } = opts;
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
 
   const pageW = 210;
   const margin = 16;
@@ -104,7 +131,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
   doc.rect(0, 0, pageW, headerH, "F");
 
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl.dataUrl, "PNG", margin, logoY, logoW, logoH);
+    doc.addImage(logoDataUrl.dataUrl, logoDataUrl.format, margin, logoY, logoW, logoH);
   }
 
   doc.setTextColor(...colors.white);
