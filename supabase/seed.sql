@@ -493,6 +493,6 @@ ON CONFLICT (id) DO NOTHING;
 -- Listas configurables de la app
 INSERT INTO public.app_config (key, values) VALUES
   ('executives', '[]'::jsonb),
-  ('statuses', '["Borrador", "Pendiente", "Aprobada", "En ejecución", "Facturada"]'::jsonb),
+  ('statuses', '["Borrador", "Pendiente", "Aprobada", "En ejecución", "Facturada", "Rechazada"]'::jsonb),
   ('currencies', '["CLP", "UF"]'::jsonb)
 ON CONFLICT (key) DO NOTHING;

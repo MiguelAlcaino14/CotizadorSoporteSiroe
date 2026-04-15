@@ -23,6 +23,7 @@ const statusColors: Record<string, string> = {
   Pendiente: "bg-warning/10 text-warning border-warning/20",
   Facturada: "bg-muted text-muted-foreground border-border",
   Borrador: "bg-secondary text-secondary-foreground border-border",
+  Rechazada: "bg-destructive/10 text-destructive border-destructive/20",
 };
 
 type CotizacionFull = Cotizacion & {
