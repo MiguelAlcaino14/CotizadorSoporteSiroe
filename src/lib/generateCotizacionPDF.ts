@@ -64,12 +64,13 @@ async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width
     }>((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
+        const MAX_PX = 600;
+        const scale = img.naturalWidth > MAX_PX ? MAX_PX / img.naturalWidth : 1;
         const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = Math.round(img.naturalWidth * scale);
+        canvas.height = Math.round(img.naturalHeight * scale);
         const ctx = canvas.getContext("2d")!;
-        ctx.drawImage(img, 0, 0);
-        // Detect transparency by checking alpha channel
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         let transparent = false;
         for (let i = 3; i < imageData.data.length; i += 4) {
@@ -78,7 +79,7 @@ async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width
         resolve({
           width: img.naturalWidth,
           height: img.naturalHeight,
-          compressedDataUrl: canvas.toDataURL("image/jpeg", 0.8),
+          compressedDataUrl: canvas.toDataURL("image/jpeg", 0.65),
           hasTransparency: transparent,
         });
       };
@@ -113,7 +114,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
     white: [255, 255, 255] as [number, number, number],
   };
 
-  const logoDataUrl = await loadImageAsDataUrl("/Logo_Siroe_opc_2_B.png");
+  const logoDataUrl = await loadImageAsDataUrl("/Logo_Siroe_opc_3_B.png");
 
   let y = margin;
 
