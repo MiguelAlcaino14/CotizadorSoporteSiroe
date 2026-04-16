@@ -125,7 +125,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
 
   // Banda de encabezado: logo (izquierda) + título/ID (derecha)
   const headerH = 32;
-  const logoW = clientColW;
+  const logoW = 25;
   const logoH = logoDataUrl ? logoW * (logoDataUrl.height / logoDataUrl.width) : 14;
   const logoY = (headerH - logoH) / 2;
   doc.setFillColor(...colors.primary);
