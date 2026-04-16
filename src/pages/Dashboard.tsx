@@ -39,7 +39,7 @@ export default function Dashboard() {
     async function fetchData() {
       const [all, docs] = await Promise.all([
         api.get<Cotizacion[]>("/cotizaciones"),
-        api.get<{ name: string; cotizacion_id: string; created_at: string }[]>("/documentos"),
+        api.get<{ name: string; cotizacion_id: string; createdAt: string }[]>("/documentos"),
       ]);
 
       const recent = [...all].slice(0, 5);
@@ -53,7 +53,7 @@ export default function Dashboard() {
 
       const acts: Activity[] = docs.slice(0, 4).map((d) => ({
         text: `Documento "${d.name}" subido para ${d.cotizacion_id}`,
-        time: new Date(d.created_at).toLocaleDateString("es-CL"),
+        time: new Date(d.createdAt).toLocaleDateString("es-CL"),
       }));
       setActivity(acts);
       setLoading(false);
@@ -105,7 +105,7 @@ export default function Dashboard() {
                     <div>
                       <p className="text-sm font-medium text-foreground">{(q as any).clientes?.name ?? "-"}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(q.created_at).toLocaleDateString("es-CL")}
+                        {new Date((q as any).createdAt ?? q.created_at).toLocaleDateString("es-CL")}
                       </p>
                     </div>
                   </div>
