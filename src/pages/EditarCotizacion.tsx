@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, FileDown, Loader as Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,14 @@ type ApiCotizacion = {
   createdAt: string;
   updatedAt: string;
   terms: string | null;
+  createdBy: string | null;
+};
+
+type ApiUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  role: string;
 };
 
 type ApiItem = {
@@ -64,6 +73,8 @@ type ApiItem = {
 export default function EditarCotizacion() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generatingPDF, setGeneratingPDF] = useState(false);
@@ -84,18 +95,22 @@ export default function EditarCotizacion() {
   const [techDescription, setTechDescription] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
+  const [createdBy, setCreatedBy] = useState<string>("");
+  const [usuarios, setUsuarios] = useState<ApiUser[]>([]);
 
   useEffect(() => {
     if (!id) return;
     async function load() {
       try {
-        const [cotData, clientesData, configs] = await Promise.all([
+        const [cotData, clientesData, configs, usuariosData] = await Promise.all([
           api.get<ApiCotizacion & { items: ApiItem[] }>(`/cotizaciones/${id}`),
           api.get<ApiCliente[]>("/clientes"),
           getAppConfigs(["executives", "statuses"]),
+          isAdmin ? api.get<ApiUser[]>("/auth/usuarios") : Promise.resolve(null),
         ]);
         setExecutives(configs["executives"] ?? []);
         setStatuses(configs["statuses"] ?? []);
+        if (usuariosData) setUsuarios(usuariosData);
         if (cotData) {
           setClientId(cotData.clientId);
           setTitle(cotData.title ?? "");
@@ -108,6 +123,7 @@ export default function EditarCotizacion() {
           if (cotData.ufValue) setUfValue(cotData.ufValue);
           setTerms(cotData.terms ?? "");
           setTechDescription(cotData.techDescription ?? "");
+          setCreatedBy(cotData.createdBy ?? "");
           if (cotData.items) {
             setItems(
               cotData.items.map((i) => ({
@@ -235,6 +251,7 @@ export default function EditarCotizacion() {
         uf_value: hasUF ? ufValue : null,
         terms: terms.trim() || null,
         items: allItems,
+        ...(isAdmin && createdBy && { created_by: createdBy }),
       });
 
       toast.success(`Cotización ${id} actualizada`);
@@ -304,6 +321,23 @@ export default function EditarCotizacion() {
               required
             />
           </div>
+          {isAdmin && (
+            <div className="space-y-1.5">
+              <Label>Creado por</Label>
+              <Select value={createdBy} onValueChange={setCreatedBy}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar usuario..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.full_name || u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
