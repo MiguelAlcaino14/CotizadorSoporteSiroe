@@ -15,6 +15,7 @@ import Configuracion from "./pages/Configuracion";
 import Clientes from "./pages/Clientes";
 import Productos from "./pages/Productos";
 import Tickets from "./pages/Tickets";
+import Tecnicos from "./pages/Tecnicos";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/productos" element={<Productos />} />
             <Route path="/tickets" element={<Tickets />} />
+            <Route path="/tecnicos" element={<Tecnicos />} />
             <Route path="/cotizaciones/:id" element={<DetalleCotizacion />} />
             <Route path="/cotizaciones/:id/editar" element={<EditarCotizacion />} />
             <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />

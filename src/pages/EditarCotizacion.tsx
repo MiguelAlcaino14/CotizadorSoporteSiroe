@@ -39,6 +39,7 @@ type ApiCotizacion = {
   status: string;
   requirement: string;
   requesterName: string | null;
+  technicianName: string | null;
   version: number;
   ufValue: number | null;
   validityDays: number;
@@ -54,6 +55,8 @@ type ApiUser = {
   full_name: string;
   role: string;
 };
+
+type ApiTecnico = { id: string; name: string; rut: string };
 
 type ApiItem = {
   id: string;
@@ -89,6 +92,7 @@ export default function EditarCotizacion() {
   const [statuses, setStatuses] = useState<string[]>([]);
   const [requirement, setRequirement] = useState("");
   const [requesterName, setRequesterName] = useState("");
+  const [technicianName, setTechnicianName] = useState("");
   const [status, setStatus] = useState("");
   const [ufValue, setUfValue] = useState<number>(0);
   const [terms, setTerms] = useState("");
@@ -97,17 +101,20 @@ export default function EditarCotizacion() {
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [createdBy, setCreatedBy] = useState<string>("");
   const [usuarios, setUsuarios] = useState<ApiUser[]>([]);
+  const [tecnicos, setTecnicos] = useState<ApiTecnico[]>([]);
 
   useEffect(() => {
     if (!id) return;
     async function load() {
       try {
-        const [cotData, clientesData, configs, usuariosData] = await Promise.all([
+        const [cotData, clientesData, configs, usuariosData, tecnicosData] = await Promise.all([
           api.get<ApiCotizacion & { items: ApiItem[] }>(`/cotizaciones/${id}`),
           api.get<ApiCliente[]>("/clientes"),
           getAppConfigs(["executives", "statuses"]),
           isAdmin ? api.get<ApiUser[]>("/auth/usuarios") : Promise.resolve(null),
+          api.get<ApiTecnico[]>("/tecnicos"),
         ]);
+        if (tecnicosData) setTecnicos(tecnicosData);
         setExecutives(configs["executives"] ?? []);
         setStatuses(configs["statuses"] ?? []);
         if (usuariosData) setUsuarios(usuariosData);
@@ -117,6 +124,7 @@ export default function EditarCotizacion() {
           setExecutive(cotData.executive);
           setRequirement(cotData.requirement ?? "");
           setRequesterName(cotData.requesterName ?? "");
+          setTechnicianName(cotData.technicianName ?? "");
           setStatus(cotData.status);
           setVersion(cotData.version ?? 1);
           setValidityDays(cotData.validityDays ?? 30);
@@ -246,6 +254,7 @@ export default function EditarCotizacion() {
         executive,
         requirement,
         requester_name: requesterName.trim() || null,
+        technician_name: technicianName.trim() || null,
         status,
         currency: hasUF ? "MIXTO" : "CLP",
         uf_value: hasUF ? ufValue : null,
@@ -300,13 +309,30 @@ export default function EditarCotizacion() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Nombre y apellido de quien solicita</Label>
-            <Input
-              placeholder="Ej: Juan Pérez"
-              value={requesterName}
-              onChange={(e) => setRequesterName(e.target.value)}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Nombre y apellido de quien solicita</Label>
+              <Input
+                placeholder="Ej: Juan Pérez"
+                value={requesterName}
+                onChange={(e) => setRequesterName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Técnico asignado</Label>
+              <Select value={technicianName} onValueChange={setTechnicianName}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar técnico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {tecnicos.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name} — {t.rut}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

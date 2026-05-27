@@ -36,6 +36,8 @@ type ApiCliente = {
   createdAt: string;
 };
 
+type ApiTecnico = { id: string; name: string; rut: string };
+
 const IVA = 0.19;
 
 interface NuevoClienteForm {
@@ -59,6 +61,8 @@ export default function NuevaCotizacion() {
   const [requirement, setRequirement] = useState("");
   const [clientId, setClientId] = useState("");
   const [requesterName, setRequesterName] = useState("");
+  const [technicianName, setTechnicianName] = useState("");
+  const [tecnicos, setTecnicos] = useState<ApiTecnico[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [nextId, setNextId] = useState("COT-001");
   const [customId, setCustomId] = useState("");
@@ -94,10 +98,12 @@ export default function NuevaCotizacion() {
 
   async function loadData() {
     try {
-      const [clientesData, cotizacionesData] = await Promise.all([
+      const [clientesData, cotizacionesData, tecnicosData] = await Promise.all([
         api.get<ApiCliente[]>("/clientes"),
         api.get<{ id: string }[]>("/cotizaciones"),
+        api.get<ApiTecnico[]>("/tecnicos"),
       ]);
+      if (tecnicosData) setTecnicos(tecnicosData);
       if (clientesData) {
         setClientes(
           clientesData.map((c) => ({
@@ -254,6 +260,7 @@ export default function NuevaCotizacion() {
         status: "Borrador",
         requirement,
         requester_name: requesterName.trim() || null,
+        technician_name: technicianName.trim() || null,
         version: 1,
         uf_value: hasUFItems ? ufValue : null,
         validity_days: validityDays,
@@ -326,13 +333,30 @@ export default function NuevaCotizacion() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>Nombre y apellido de quien solicita</Label>
-            <Input
-              placeholder="Ej: Juan Pérez"
-              value={requesterName}
-              onChange={(e) => setRequesterName(e.target.value)}
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label>Nombre y apellido de quien solicita</Label>
+              <Input
+                placeholder="Ej: Juan Pérez"
+                value={requesterName}
+                onChange={(e) => setRequesterName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Técnico asignado</Label>
+              <Select value={technicianName} onValueChange={setTechnicianName}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar técnico..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {tecnicos.map((t) => (
+                    <SelectItem key={t.id} value={t.name}>
+                      {t.name} — {t.rut}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 

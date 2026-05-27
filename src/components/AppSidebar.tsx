@@ -7,6 +7,7 @@ import {
   Users,
   Package,
   Ticket,
+  HardHat,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -30,6 +31,7 @@ const allItems = [
   // { title: "Tickets", url: "/tickets", icon: Ticket, adminOnly: false },
   { title: "Clientes", url: "/clientes", icon: Users, adminOnly: false },
   { title: "Productos", url: "/productos", icon: Package, adminOnly: false },
+  { title: "Técnicos", url: "/tecnicos", icon: HardHat, adminOnly: false },
   { title: "Configuración", url: "/configuracion", icon: Settings, adminOnly: true },
 ];
 
