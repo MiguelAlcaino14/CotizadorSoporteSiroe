@@ -131,6 +131,16 @@ type TecnicoDocumento = {
   createdAt: string;
 };
 
+type TecnicoAbono = {
+  id: string;
+  asignacionId: string;
+  monto: number;
+  tipoPago: string;
+  ufValue: number | null;
+  notas: string;
+  createdAt: string;
+};
+
 type CotizacionResumen = {
   id: string;
   title: string;
@@ -151,6 +161,7 @@ type Asignacion = {
   createdAt: string;
   tecnico: Tecnico;
   documentos: TecnicoDocumento[];
+  abonos: TecnicoAbono[];
   cotizacion: CotizacionResumen | null;
 };
 
@@ -200,10 +211,29 @@ function estadoBadge(estado: string) {
     : "bg-warning/10 text-warning border-warning/20";
 }
 
+function totalEnCLPNum(a: Asignacion): number {
+  const clp = a.montoClp ?? 0;
+  const uf = a.montoUf != null && a.ufValue != null ? a.montoUf * a.ufValue : 0;
+  return clp + uf;
+}
+
+function abonoEnCLPNum(ab: TecnicoAbono): number {
+  if (ab.tipoPago === "CLP") return ab.monto;
+  if (ab.ufValue != null) return ab.monto * ab.ufValue;
+  return 0;
+}
+
+function fmtCLP(n: number): string {
+  if (n === 0) return "$0 CLP";
+  return `$${Math.round(n).toLocaleString("es-CL")} CLP`;
+}
+
 // ─── Componente AsignacionCard ─────────────────────────────────────────────────
 
+type AbonoPayload = { monto: number; tipo_pago: string; uf_value: number | null; notas: string };
+
 function AsignacionCard({
-  asignacion, isAdmin, onEdit, onDelete, onUploadDoc, onDeleteDoc, uploading,
+  asignacion, isAdmin, onEdit, onDelete, onUploadDoc, onDeleteDoc, uploading, onAddAbono, onDeleteAbono, addingAbono,
 }: {
   asignacion: Asignacion;
   isAdmin: boolean;
@@ -212,12 +242,39 @@ function AsignacionCard({
   onUploadDoc: (asignacionId: string, file: File, name: string, type: string) => Promise<void>;
   onDeleteDoc: (asignacionId: string, docId: string) => Promise<void>;
   uploading: string | null;
+  onAddAbono: (asignacionId: string, data: AbonoPayload) => Promise<void>;
+  onDeleteAbono: (asignacionId: string, abonoId: string) => Promise<void>;
+  addingAbono: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [docForm, setDocForm] = useState({ name: "", type: TIPOS_DOC[0] });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showAbonoForm, setShowAbonoForm] = useState(false);
+  const [abonoForm, setAbonoForm] = useState({ monto: "", tipo_pago: "CLP", uf_value: "", notas: "" });
+  const [fetchingAbonoUf, setFetchingAbonoUf] = useState(false);
+
+  const totalCLP = totalEnCLPNum(asignacion);
+  const abonadoCLP = asignacion.abonos.reduce((sum, ab) => sum + abonoEnCLPNum(ab), 0);
+  const pendienteCLP = Math.max(0, totalCLP - abonadoCLP);
+
+  const fetchAbonoUf = async () => {
+    setFetchingAbonoUf(true);
+    try {
+      const res = await fetch("https://mindicador.cl/api/uf");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const valor: number = data?.serie?.[0]?.valor;
+      if (!valor) throw new Error();
+      setAbonoForm((prev) => ({ ...prev, uf_value: String(valor) }));
+      toast.success(`UF del día: $${valor.toLocaleString("es-CL")}`);
+    } catch {
+      toast.error("No se pudo obtener el valor de la UF");
+    } finally {
+      setFetchingAbonoUf(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!selectedFile || !docForm.name) { toast.error("Completa nombre y selecciona un archivo"); return; }
@@ -225,6 +282,19 @@ function AsignacionCard({
     setDocForm({ name: "", type: TIPOS_DOC[0] });
     setSelectedFile(null);
     setShowUpload(false);
+  };
+
+  const handleAddAbono = async () => {
+    if (!abonoForm.monto || parseFloat(abonoForm.monto) <= 0) { toast.error("Ingresa un monto válido"); return; }
+    if (abonoForm.tipo_pago === "UF" && !abonoForm.uf_value) { toast.error("Ingresa el valor de la UF"); return; }
+    await onAddAbono(asignacion.id, {
+      monto: parseFloat(abonoForm.monto),
+      tipo_pago: abonoForm.tipo_pago,
+      uf_value: abonoForm.uf_value ? parseFloat(abonoForm.uf_value) : null,
+      notas: abonoForm.notas,
+    });
+    setAbonoForm({ monto: "", tipo_pago: "CLP", uf_value: "", notas: "" });
+    setShowAbonoForm(false);
   };
 
   return (
@@ -241,17 +311,35 @@ function AsignacionCard({
           {asignacion.cotizacion ? (
             <p className="text-sm text-muted-foreground mt-0.5">
               {asignacion.cotizacion.cliente.name}
-              {asignacion.cotizacion.title && (
-                <span className="text-xs"> · {asignacion.cotizacion.title}</span>
-              )}
+              {asignacion.cotizacion.title && <span className="text-xs"> · {asignacion.cotizacion.title}</span>}
             </p>
           ) : null}
           <p className="text-sm text-muted-foreground">{asignacion.tecnico.name}</p>
-          <p className={`text-sm font-semibold mt-1 ${asignacion.estado === "Pagado" ? "text-success" : "text-foreground"}`}>
-            {asignacion.estado === "Pagado" ? "Pagado: " : "Por pagar: "}{montoEnCLP(asignacion)}
-          </p>
+
+          {/* Resumen financiero */}
+          <div className="text-xs mt-1.5 space-y-0.5">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground w-16">Total:</span>
+              <span className="font-medium">{fmtCLP(totalCLP)}</span>
+            </div>
+            {asignacion.abonos.length > 0 && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-16">Abonado:</span>
+                  <span className="font-medium text-success">{fmtCLP(abonadoCLP)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-16">Pendiente:</span>
+                  <span className={`font-semibold ${pendienteCLP <= 0 ? "text-success" : "text-warning"}`}>
+                    {fmtCLP(pendienteCLP)}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
           {asignacion.ufValue && asignacion.tipoPago !== "CLP" && (
-            <p className="text-xs text-muted-foreground">Valor UF: ${asignacion.ufValue.toLocaleString("es-CL")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Valor UF: ${asignacion.ufValue.toLocaleString("es-CL")}</p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -272,65 +360,161 @@ function AsignacionCard({
       {asignacion.notas && <p className="text-xs text-muted-foreground border-t pt-2">{asignacion.notas}</p>}
 
       {expanded && (
-        <div className="border-t pt-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase">Documentos ({asignacion.documentos.length})</span>
-            <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowUpload(!showUpload)}>
-              <Upload className="h-3 w-3" /> Subir
-            </Button>
-          </div>
+        <div className="border-t pt-3 space-y-4">
 
-          {showUpload && (
-            <div className="bg-muted/30 rounded-lg p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label className="text-xs">Nombre</Label>
-                  <Input className="h-8 text-xs" placeholder="Ej: Comprobante enero" value={docForm.name} onChange={(e) => setDocForm({ ...docForm, name: e.target.value })} />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Tipo</Label>
-                  <Select value={docForm.type} onValueChange={(v) => setDocForm({ ...docForm, type: v })}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {TIPOS_DOC.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input ref={fileRef} type="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => fileRef.current?.click()}>
-                  {selectedFile ? selectedFile.name : "Seleccionar archivo"}
-                </Button>
-                <Button size="sm" className="h-7 text-xs" onClick={handleUpload} disabled={uploading === asignacion.id}>
-                  {uploading === asignacion.id ? "Subiendo..." : "Subir"}
-                </Button>
-              </div>
+          {/* ── Abonos ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase">Abonos ({asignacion.abonos.length})</span>
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowAbonoForm(!showAbonoForm)}>
+                <Banknote className="h-3 w-3" /> Registrar
+              </Button>
             </div>
-          )}
 
-          {asignacion.documentos.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">Sin documentos adjuntos</p>
-          ) : (
-            <div className="space-y-1.5">
-              {asignacion.documentos.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-muted/20 rounded-lg">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <div className="min-w-0">
-                      <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium hover:underline truncate block">{doc.name}</a>
-                      <p className="text-[10px] text-muted-foreground">{doc.type}</p>
+            {showAbonoForm && (
+              <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Monto</Label>
+                    <Input className="h-8 text-xs" type="number" placeholder="0"
+                      value={abonoForm.monto}
+                      onChange={(e) => setAbonoForm({ ...abonoForm, monto: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={abonoForm.tipo_pago} onValueChange={(v) => setAbonoForm({ ...abonoForm, tipo_pago: v, uf_value: "" })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CLP">CLP</SelectItem>
+                        <SelectItem value="UF">UF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {abonoForm.tipo_pago === "UF" && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valor UF</Label>
+                    <div className="flex gap-1.5">
+                      <Input className="h-8 text-xs" type="number" placeholder="0"
+                        value={abonoForm.uf_value}
+                        onChange={(e) => setAbonoForm({ ...abonoForm, uf_value: e.target.value })}
+                      />
+                      <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={fetchAbonoUf} disabled={fetchingAbonoUf} title="UF actual">
+                        <RefreshCw className={`h-3.5 w-3.5 ${fetchingAbonoUf ? "animate-spin" : ""}`} />
+                      </Button>
                     </div>
                   </div>
-                  {isAdmin && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onDeleteDoc(asignacion.id, doc.id)}>
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs">Notas</Label>
+                  <Input className="h-8 text-xs" placeholder="Observación opcional"
+                    value={abonoForm.notas}
+                    onChange={(e) => setAbonoForm({ ...abonoForm, notas: e.target.value })}
+                  />
                 </div>
-              ))}
+                <div className="flex gap-2">
+                  <Button size="sm" className="h-7 text-xs flex-1" onClick={handleAddAbono} disabled={addingAbono === asignacion.id}>
+                    {addingAbono === asignacion.id ? "Registrando..." : "Registrar Abono"}
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setShowAbonoForm(false); setAbonoForm({ monto: "", tipo_pago: "CLP", uf_value: "", notas: "" }); }}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {asignacion.abonos.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">Sin abonos registrados</p>
+            ) : (
+              <div className="space-y-1.5">
+                {asignacion.abonos.map((ab) => (
+                  <div key={ab.id} className="flex items-center justify-between gap-2 p-2 bg-muted/20 rounded-lg">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium">
+                        {ab.tipoPago === "UF"
+                          ? `${ab.monto.toLocaleString("es-CL", { maximumFractionDigits: 4 })} UF`
+                          : `$${Math.round(ab.monto).toLocaleString("es-CL")} CLP`}
+                        {ab.tipoPago === "UF" && ab.ufValue && (
+                          <span className="text-muted-foreground font-normal"> ≈ {fmtCLP(ab.monto * ab.ufValue)}</span>
+                        )}
+                      </p>
+                      {ab.notas && <p className="text-[10px] text-muted-foreground truncate">{ab.notas}</p>}
+                      <p className="text-[10px] text-muted-foreground">{new Date(ab.createdAt).toLocaleDateString("es-CL")}</p>
+                    </div>
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDeleteAbono(asignacion.id, ab.id)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Documentos ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground uppercase">Documentos ({asignacion.documentos.length})</span>
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowUpload(!showUpload)}>
+                <Upload className="h-3 w-3" /> Subir
+              </Button>
             </div>
-          )}
+
+            {showUpload && (
+              <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nombre</Label>
+                    <Input className="h-8 text-xs" placeholder="Ej: Comprobante enero" value={docForm.name} onChange={(e) => setDocForm({ ...docForm, name: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={docForm.type} onValueChange={(v) => setDocForm({ ...docForm, type: v })}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_DOC.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input ref={fileRef} type="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)} />
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => fileRef.current?.click()}>
+                    {selectedFile ? selectedFile.name : "Seleccionar archivo"}
+                  </Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={handleUpload} disabled={uploading === asignacion.id}>
+                    {uploading === asignacion.id ? "Subiendo..." : "Subir"}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {asignacion.documentos.length === 0 ? (
+              <p className="text-xs text-muted-foreground italic">Sin documentos adjuntos</p>
+            ) : (
+              <div className="space-y-1.5">
+                {asignacion.documentos.map((doc) => (
+                  <div key={doc.id} className="flex items-center justify-between gap-2 p-2 bg-muted/20 rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium hover:underline truncate block">{doc.name}</a>
+                        <p className="text-[10px] text-muted-foreground">{doc.type}</p>
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onDeleteDoc(asignacion.id, doc.id)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -351,6 +535,7 @@ export default function Tecnicos() {
   const [search, setSearch] = useState("");
   const [searchAsig, setSearchAsig] = useState("");
   const [uploading, setUploading] = useState<string | null>(null);
+  const [addingAbono, setAddingAbono] = useState<string | null>(null);
 
   // Sheet detalle técnico
   const [sheetTec, setSheetTec] = useState<TecnicoDetail | null>(null);
@@ -581,6 +766,24 @@ export default function Tecnicos() {
     setUploading(null);
   };
 
+  const handleAddAbono = async (asignacionId: string, data: AbonoPayload) => {
+    setAddingAbono(asignacionId);
+    try {
+      await api.post(`/tecnicos/asignaciones/${asignacionId}/abonos`, data);
+      toast.success("Abono registrado");
+      await fetchAsignaciones();
+    } catch { toast.error("Error al registrar abono"); }
+    setAddingAbono(null);
+  };
+
+  const handleDeleteAbono = async (asignacionId: string, abonoId: string) => {
+    try {
+      await api.delete(`/tecnicos/asignaciones/${asignacionId}/abonos/${abonoId}`);
+      toast.success("Abono eliminado");
+      await fetchAsignaciones();
+    } catch { toast.error("Error al eliminar abono"); }
+  };
+
   const handleDeleteDoc = async (asignacionId: string, docId: string) => {
     try {
       await api.delete(`/tecnicos/asignaciones/${asignacionId}/documentos/${docId}`);
@@ -701,6 +904,9 @@ export default function Tecnicos() {
                 onUploadDoc={handleUploadDoc}
                 onDeleteDoc={handleDeleteDoc}
                 uploading={uploading}
+                onAddAbono={handleAddAbono}
+                onDeleteAbono={handleDeleteAbono}
+                addingAbono={addingAbono}
               />
             ))}
           </div>
