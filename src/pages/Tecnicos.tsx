@@ -534,6 +534,7 @@ export default function Tecnicos() {
   const [loadingAsig, setLoadingAsig] = useState(true);
   const [search, setSearch] = useState("");
   const [searchAsig, setSearchAsig] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState("todos");
   const [uploading, setUploading] = useState<string | null>(null);
   const [addingAbono, setAddingAbono] = useState<string | null>(null);
 
@@ -800,12 +801,13 @@ export default function Tecnicos() {
 
   const filteredAsig = asignaciones.filter((a) => {
     const q = searchAsig.toLowerCase();
-    return (
+    const matchesSearch =
       a.ticketId.toLowerCase().includes(q) ||
       a.tecnico.name.toLowerCase().includes(q) ||
       (a.cotizacion?.title ?? "").toLowerCase().includes(q) ||
-      (a.cotizacion?.cliente.name ?? "").toLowerCase().includes(q)
-    );
+      (a.cotizacion?.cliente.name ?? "").toLowerCase().includes(q);
+    const matchesEstado = filtroEstado === "todos" || a.estado === filtroEstado;
+    return matchesSearch && matchesEstado;
   });
 
 
@@ -876,12 +878,24 @@ export default function Tecnicos() {
       {/* ── Sección Asignaciones ── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <h2 className="font-semibold text-foreground">Asignaciones ({asignaciones.length})</h2>
-          <div className="flex items-center gap-3">
-            <div className="relative max-w-sm flex-1">
+          <h2 className="font-semibold text-foreground">
+            Asignaciones ({filteredAsig.length}{filteredAsig.length !== asignaciones.length && ` de ${asignaciones.length}`})
+          </h2>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative max-w-sm flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Buscar por ticket o técnico..." value={searchAsig} onChange={(e) => setSearchAsig(e.target.value)} className="pl-9" />
             </div>
+            <Select value={filtroEstado} onValueChange={setFiltroEstado}>
+              <SelectTrigger className="h-10 w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="Pendiente">Pendiente</SelectItem>
+                <SelectItem value="Pagado">Pagado</SelectItem>
+              </SelectContent>
+            </Select>
             <Button className="gap-2" onClick={openCreateAsig}>
               <Plus className="h-4 w-4" /> Nueva Asignación
             </Button>
