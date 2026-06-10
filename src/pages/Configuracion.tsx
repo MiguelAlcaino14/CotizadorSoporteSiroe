@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { type Profile } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserPlus, Trash2 } from "lucide-react";
+import { UserPlus, Trash2, KeyRound } from "lucide-react";
 
 export default function Configuracion() {
   const { profile } = useAuth();
@@ -58,6 +58,11 @@ export default function Configuracion() {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUser, setNewUser] = useState({ email: "", password: "", full_name: "", role: "comercial" as "admin" | "comercial" });
   const [creatingUser, setCreatingUser] = useState(false);
+
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     async function fetchConfig() {
@@ -124,6 +129,21 @@ export default function Configuracion() {
     } catch {
       toast.error("Error al cambiar el rol");
     }
+  };
+
+  const handleChangePassword = async () => {
+    if (!selectedUser || !newPassword) return;
+    setChangingPassword(true);
+    try {
+      await api.put(`/auth/usuarios/${selectedUser.id}/password`, { new_password: newPassword });
+      toast.success(`Contraseña de ${selectedUser.email} actualizada`);
+      setShowChangePassword(false);
+      setNewPassword("");
+      setSelectedUser(null);
+    } catch (e: any) {
+      toast.error(e.message ?? "Error al cambiar contraseña");
+    }
+    setChangingPassword(false);
   };
 
   const handleDeleteUser = async (userId: string, email: string) => {
@@ -241,7 +261,7 @@ export default function Configuracion() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead className="w-16"></TableHead>
+                  <TableHead className="w-24"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,14 +284,25 @@ export default function Configuracion() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDeleteUser(p.id, p.email)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-blue-600"
+                          title="Cambiar contraseña"
+                          onClick={() => { setSelectedUser(p); setNewPassword(""); setShowChangePassword(true); }}
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeleteUser(p.id, p.email)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -280,6 +311,35 @@ export default function Configuracion() {
           )}
         </div>
       )}
+
+      <Dialog open={showChangePassword} onOpenChange={(open) => { setShowChangePassword(open); if (!open) setNewPassword(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Usuario: <span className="font-medium text-foreground">{selectedUser?.email}</span>
+            </p>
+            <div className="space-y-1.5">
+              <Label>Nueva contraseña</Label>
+              <Input
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleChangePassword()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowChangePassword(false)}>Cancelar</Button>
+            <Button onClick={handleChangePassword} disabled={changingPassword || newPassword.length < 6}>
+              {changingPassword ? "Guardando..." : "Cambiar contraseña"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showCreateUser} onOpenChange={setShowCreateUser}>
         <DialogContent>
