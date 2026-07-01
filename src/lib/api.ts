@@ -17,8 +17,22 @@ export function getTokenExpiry(): number | null {
 
 let refreshPromise: Promise<void> | null = null;
 
-export async function refreshToken(): Promise<void> {
-  return doRefresh();
+// Para el intervalo periódico: no redirige al login si falla, solo reintenta en la próxima vuelta
+export async function silentRefresh(): Promise<void> {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    localStorage.setItem("auth_token", data.access_token);
+    if (data.user) localStorage.setItem("auth_user", JSON.stringify(data.user));
+  } catch {
+    // error de red — no expulsar al usuario, reintentar en 2 min
+  }
 }
 
 async function doRefresh(): Promise<void> {

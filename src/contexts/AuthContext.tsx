@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api, refreshToken, getTokenExpiry } from "@/lib/api";
+import { api, silentRefresh, getTokenExpiry } from "@/lib/api";
 import type { Profile } from "@/lib/supabase";
 
 type AuthUser = { id: string; email: string };
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!exp) return;
       const secsLeft = exp - Date.now() / 1000;
       if (secsLeft > 0 && secsLeft < 600) {
-        try { await refreshToken(); } catch { /* el request de api ya redirige al login si falla */ }
+        await silentRefresh();
       }
     }, 2 * 60 * 1000);
     return () => clearInterval(interval);
