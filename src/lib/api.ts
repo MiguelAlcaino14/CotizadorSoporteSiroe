@@ -17,6 +17,10 @@ function getTokenExpiry(): number | null {
 
 let refreshPromise: Promise<void> | null = null;
 
+export async function refreshToken(): Promise<void> {
+  return doRefresh();
+}
+
 async function doRefresh(): Promise<void> {
   const token = getToken();
   if (!token) throw new Error("No token");

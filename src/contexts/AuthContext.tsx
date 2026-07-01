@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api } from "@/lib/api";
+import { api, refreshToken, getTokenExpiry } from "@/lib/api";
 import type { Profile } from "@/lib/supabase";
 
 type AuthUser = { id: string; email: string };
@@ -34,6 +34,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
     setLoading(false);
+  }, []);
+
+  // Refresco periódico: cada 2 minutos verifica si el token vence en menos de 10 minutos
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const exp = getTokenExpiry();
+      if (!exp) return;
+      const secsLeft = exp - Date.now() / 1000;
+      if (secsLeft > 0 && secsLeft < 600) {
+        try { await refreshToken(); } catch { /* el request de api ya redirige al login si falla */ }
+      }
+    }, 2 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   async function signIn(email: string, password: string) {
