@@ -4,7 +4,7 @@ function getToken(): string | null {
   return localStorage.getItem("auth_token");
 }
 
-function getTokenExpiry(): number | null {
+export function getTokenExpiry(): number | null {
   const token = getToken();
   if (!token) return null;
   try {
