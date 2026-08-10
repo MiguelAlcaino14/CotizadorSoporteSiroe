@@ -115,7 +115,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
     white: [255, 255, 255] as [number, number, number],
   };
 
-  const logoDataUrl = await loadImageAsDataUrl("/logo-solvitec.png");
+  const logoDataUrl = await loadImageAsDataUrl("/logo-solvitec-white.png");
 
   let y = margin;
 
@@ -125,8 +125,8 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
   const quoteX = margin + clientColW + gap;
 
   // Banda de encabezado: logo (izquierda) + título/ID (derecha)
-  const headerH = 32;
-  const logoW = 25;
+  const headerH = 36;
+  const logoW = 120;
   const logoH = logoDataUrl ? logoW * (logoDataUrl.height / logoDataUrl.width) : 14;
   const logoY = (headerH - logoH) / 2;
   doc.setFillColor(...colors.primary);
