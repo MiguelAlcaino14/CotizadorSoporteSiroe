@@ -26,8 +26,8 @@ const TRANSFER_DATA = {
   tipoCuenta: "Cuenta Corriente",
   numeroCuenta: "97713421",
   rut: "78.144.127-9",
-  titular: "Soporte Siroe SPA",
-  email: "administracion@soportesiroe.cl",
+  titular: "Solvitec SpA",
+  email: "administracion@solvitec.cl",
 };
 
 interface GeneratePDFOptions {
@@ -44,6 +44,7 @@ interface GeneratePDFOptions {
   validityDays?: number;
   terms?: string;
   requesterName?: string;
+  discountPercent?: number;
 }
 
 async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width: number; height: number; format: "PNG" | "JPEG" } | null> {
@@ -97,7 +98,7 @@ async function loadImageAsDataUrl(url: string): Promise<{ dataUrl: string; width
 }
 
 export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<void> {
-  const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal, validityDays = 30, terms, requesterName } = opts;
+  const { cotizacionId, cliente, executive, requirement, items, ufValue, netTotal, ivaAmount, grandTotal, validityDays = 30, terms, requesterName, discountPercent = 0 } = opts;
   const doc = new jsPDF({ unit: "mm", format: "a4", compress: true });
 
   const pageW = 210;
@@ -105,7 +106,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
   const contentW = pageW - margin * 2;
 
   const colors = {
-    primary: [76, 34, 77] as [number, number, number],
+    primary: [3, 136, 247] as [number, number, number],
     text: [17, 24, 39] as [number, number, number],
     muted: [107, 114, 128] as [number, number, number],
     border: [229, 231, 235] as [number, number, number],
@@ -114,7 +115,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
     white: [255, 255, 255] as [number, number, number],
   };
 
-  const logoDataUrl = await loadImageAsDataUrl("/Logo_Siroe_opc_3_B.png");
+  const logoDataUrl = await loadImageAsDataUrl("/logo-solvitec.png");
 
   let y = margin;
 
@@ -274,7 +275,7 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
     const catItems = groupedMap.get(cat)!;
 
     if (multipleGroups) {
-      doc.setFillColor(220, 210, 230);
+      doc.setFillColor(210, 230, 252);
       doc.rect(margin, y, contentW, 6, "F");
       doc.setFontSize(7);
       doc.setFont("helvetica", "bold");
@@ -338,10 +339,16 @@ export async function generateCotizacionPDF(opts: GeneratePDFOptions): Promise<v
 
   y += 2;
 
-  const summaryRows: [string, string][] = [
-    ["Neto", `$${Math.round(netTotal).toLocaleString("es-CL")}`],
-    ["IVA (19%)", `$${Math.round(ivaAmount).toLocaleString("es-CL")}`],
-  ];
+  const summaryRows: [string, string][] = discountPercent > 0
+    ? [
+        ["Neto", `$${Math.round(netTotal).toLocaleString("es-CL")}`],
+        [`Descuento (${discountPercent}%)`, `-$${Math.round(netTotal * discountPercent / 100).toLocaleString("es-CL")}`],
+        ["IVA (19%)", `$${Math.round(ivaAmount).toLocaleString("es-CL")}`],
+      ]
+    : [
+        ["Neto", `$${Math.round(netTotal).toLocaleString("es-CL")}`],
+        ["IVA (19%)", `$${Math.round(ivaAmount).toLocaleString("es-CL")}`],
+      ];
 
   const summaryStartX = margin + 132;
   const summaryWidth = contentW - 132;

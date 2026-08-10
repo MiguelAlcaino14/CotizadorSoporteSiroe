@@ -84,6 +84,7 @@ export default function NuevaCotizacion() {
     address: "",
   });
   const [terms, setTerms] = useState("");
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [items, setItems] = useState<LineItem[]>([
     { id: 1, service: "", description: "", quantity: 1, unitPrice: 0, currency: "CLP", category: "Servicio", rentalPeriod: "" },
   ]);
@@ -146,8 +147,10 @@ export default function NuevaCotizacion() {
 
   const hasUFItems = items.some((i) => i.currency === "UF");
   const netTotal = items.reduce((sum, i) => sum + itemTotalCLP(i, ufValue), 0);
-  const ivaAmount = netTotal * IVA;
-  const grandTotal = netTotal + ivaAmount;
+  const discountAmount = netTotal * discountPercent / 100;
+  const discountedNeto = netTotal - discountAmount;
+  const ivaAmount = discountedNeto * IVA;
+  const grandTotal = discountedNeto + ivaAmount;
   const selectedCliente = clientes.find((c) => c.id === clientId);
 
   const handleGuardarNuevoCliente = async () => {
@@ -203,6 +206,7 @@ export default function NuevaCotizacion() {
         grandTotal,
         terms,
         requesterName,
+        discountPercent,
       });
       toast.success(`PDF ${customId.trim() || nextId}.pdf descargado`);
     } catch {
@@ -264,6 +268,7 @@ export default function NuevaCotizacion() {
         version: 1,
         uf_value: hasUFItems ? ufValue : null,
         validity_days: validityDays,
+        discount_percent: discountPercent,
         terms: terms.trim() || null,
         items: itemsToInsert,
       });
@@ -400,6 +405,18 @@ export default function NuevaCotizacion() {
                 placeholder="30"
                 value={validityDays}
                 onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descuento (%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.01}
+                placeholder="0"
+                value={discountPercent || ""}
+                onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
               />
             </div>
           </div>

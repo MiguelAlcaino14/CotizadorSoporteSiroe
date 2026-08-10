@@ -107,6 +107,7 @@ type Tecnico = {
   banco: string;
   tipoCuenta: string;
   numeroCuenta: string;
+  tipo: string;
   createdAt: string;
   asignaciones?: { id: string }[];
 };
@@ -167,7 +168,7 @@ type Asignacion = {
 
 type TecnicoForm = {
   name: string; rut: string; email: string; phone: string;
-  banco: string; tipoCuenta: string; numeroCuenta: string;
+  banco: string; tipoCuenta: string; numeroCuenta: string; tipo: string;
 };
 
 type AsignacionForm = {
@@ -175,7 +176,7 @@ type AsignacionForm = {
   monto_clp: string; monto_uf: string; uf_value: string; notas: string; estado: string;
 };
 
-const emptyTecnico: TecnicoForm = { name: "", rut: "", email: "", phone: "", banco: "", tipoCuenta: "", numeroCuenta: "" };
+const emptyTecnico: TecnicoForm = { name: "", rut: "", email: "", phone: "", banco: "", tipoCuenta: "", numeroCuenta: "", tipo: "Externo" };
 const emptyAsignacion: AsignacionForm = { ticket_id: "", tecnico_id: "", tipo_pago: "CLP", monto_clp: "", monto_uf: "", uf_value: "", notas: "", estado: "Pendiente" };
 
 const TIPO_CUENTA = ["Cuenta Corriente", "Cuenta Vista", "Cuenta de Ahorro", "Cuenta RUT"];
@@ -646,7 +647,7 @@ export default function Tecnicos() {
   const openCreateTec = () => { setEditingTec(null); setTecForm(emptyTecnico); setShowTecModal(true); };
   const openEditTec = (t: Tecnico) => {
     setEditingTec(t.id);
-    setTecForm({ name: t.name, rut: t.rut, email: t.email, phone: t.phone, banco: t.banco, tipoCuenta: t.tipoCuenta, numeroCuenta: t.numeroCuenta });
+    setTecForm({ name: t.name, rut: t.rut, email: t.email, phone: t.phone, banco: t.banco, tipoCuenta: t.tipoCuenta, numeroCuenta: t.numeroCuenta, tipo: t.tipo ?? "Externo" });
     setShowTecModal(true);
   };
 
@@ -861,13 +862,18 @@ export default function Tecnicos() {
                   </div>
                   {t.email && <p className="text-xs text-muted-foreground truncate">{t.email}</p>}
                   {t.phone && <p className="text-xs text-muted-foreground">{t.phone}</p>}
-                  {t.banco && (
+                  {t.banco && t.tipo !== "Interno" && (
                     <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                       <Banknote className="h-3 w-3 shrink-0" />
                       <span className="truncate">{t.banco} · {t.numeroCuenta}</span>
                     </div>
                   )}
-                  <Badge variant="secondary" className="text-[10px] h-4">{t.asignaciones?.length ?? 0} asig.</Badge>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <Badge variant="secondary" className="text-[10px] h-4">{t.asignaciones?.length ?? 0} asig.</Badge>
+                    {t.tipo === "Interno" && (
+                      <Badge variant="outline" className="text-[10px] h-4 text-primary border-primary/40">Interno</Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -934,14 +940,22 @@ export default function Tecnicos() {
             <DialogTitle>{editingTec ? "Editar Técnico" : "Nuevo Técnico"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Tipo de Técnico</Label>
+              <Select value={tecForm.tipo} onValueChange={(v) => setTecForm({ ...tecForm, tipo: v })}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Externo">Externo</SelectItem>
+                  <SelectItem value="Interno">Interno</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: "Nombre *", key: "name", placeholder: "Nombre completo" },
                 { label: "RUT *", key: "rut", placeholder: "XX.XXX.XXX-X" },
                 { label: "Correo", key: "email", placeholder: "correo@ejemplo.cl", type: "email" },
                 { label: "Teléfono", key: "phone", placeholder: "+56 9 XXXX XXXX" },
-                { label: "Banco", key: "banco", placeholder: "Banco Estado, Santander..." },
-                { label: "N° Cuenta", key: "numeroCuenta", placeholder: "Número de cuenta" },
               ].map(({ label, key, placeholder, type }) => (
                 <div key={key} className="space-y-1">
                   <Label className="text-xs">{label}</Label>
@@ -952,15 +966,33 @@ export default function Tecnicos() {
                 </div>
               ))}
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Tipo de Cuenta</Label>
-              <Select value={tecForm.tipoCuenta} onValueChange={(v) => setTecForm({ ...tecForm, tipoCuenta: v })}>
-                <SelectTrigger className="h-8"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                <SelectContent>
-                  {TIPO_CUENTA.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {tecForm.tipo === "Externo" && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Banco", key: "banco", placeholder: "Banco Estado, Santander..." },
+                    { label: "N° Cuenta", key: "numeroCuenta", placeholder: "Número de cuenta" },
+                  ].map(({ label, key, placeholder }) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-xs">{label}</Label>
+                      <Input placeholder={placeholder} className="h-8"
+                        value={tecForm[key as keyof TecnicoForm]}
+                        onChange={(e) => setTecForm({ ...tecForm, [key]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo de Cuenta</Label>
+                  <Select value={tecForm.tipoCuenta} onValueChange={(v) => setTecForm({ ...tecForm, tipoCuenta: v })}>
+                    <SelectTrigger className="h-8"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {TIPO_CUENTA.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTecModal(false)}>Cancelar</Button>
@@ -1003,55 +1035,70 @@ export default function Tecnicos() {
                   options={tecnicos.map((t) => ({
                     value: t.id,
                     label: t.name,
-                    sublabel: t.rut,
+                    sublabel: `${t.rut}${t.tipo === "Interno" ? " · Interno" : ""}`,
                   }))}
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Tipo de Pago</Label>
-              <Select value={asigForm.tipo_pago} onValueChange={(v) => setAsigForm({ ...asigForm, tipo_pago: v })}>
-                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CLP">CLP</SelectItem>
-                  <SelectItem value="UF">UF</SelectItem>
-                  <SelectItem value="Mixto">Mixto (CLP + UF)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {(asigForm.tipo_pago === "CLP" || asigForm.tipo_pago === "Mixto") && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Monto CLP</Label>
-                  <Input className="h-8" type="number" placeholder="0" value={asigForm.monto_clp}
-                    onChange={(e) => setAsigForm({ ...asigForm, monto_clp: e.target.value })}
-                  />
-                </div>
-              )}
-              {(asigForm.tipo_pago === "UF" || asigForm.tipo_pago === "Mixto") && (
+            {(() => {
+              const selectedTecnico = tecnicos.find((t) => t.id === asigForm.tecnico_id);
+              const isInterno = selectedTecnico?.tipo === "Interno";
+              if (isInterno) {
+                return (
+                  <div className="rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 text-xs text-primary font-medium">
+                    Técnico Interno — asignación sin costo externo
+                  </div>
+                );
+              }
+              return (
                 <>
                   <div className="space-y-1">
-                    <Label className="text-xs">Monto UF</Label>
-                    <Input className="h-8" type="number" step="0.0001" placeholder="0.0000" value={asigForm.monto_uf}
-                      onChange={(e) => setAsigForm({ ...asigForm, monto_uf: e.target.value })}
-                    />
+                    <Label className="text-xs">Tipo de Pago</Label>
+                    <Select value={asigForm.tipo_pago} onValueChange={(v) => setAsigForm({ ...asigForm, tipo_pago: v })}>
+                      <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CLP">CLP</SelectItem>
+                        <SelectItem value="UF">UF</SelectItem>
+                        <SelectItem value="Mixto">Mixto (CLP + UF)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Valor UF del día</Label>
-                    <div className="flex gap-1.5">
-                      <Input className="h-8" type="number" placeholder="0" value={asigForm.uf_value}
-                        onChange={(e) => setAsigForm({ ...asigForm, uf_value: e.target.value })}
-                      />
-                      <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={fetchUfActual} disabled={fetchingUf} title="Obtener UF actual">
-                        <RefreshCw className={`h-3.5 w-3.5 ${fetchingUf ? "animate-spin" : ""}`} />
-                      </Button>
-                    </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {(asigForm.tipo_pago === "CLP" || asigForm.tipo_pago === "Mixto") && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Monto CLP</Label>
+                        <Input className="h-8" type="number" placeholder="0" value={asigForm.monto_clp}
+                          onChange={(e) => setAsigForm({ ...asigForm, monto_clp: e.target.value })}
+                        />
+                      </div>
+                    )}
+                    {(asigForm.tipo_pago === "UF" || asigForm.tipo_pago === "Mixto") && (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Monto UF</Label>
+                          <Input className="h-8" type="number" step="0.0001" placeholder="0.0000" value={asigForm.monto_uf}
+                            onChange={(e) => setAsigForm({ ...asigForm, monto_uf: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Valor UF del día</Label>
+                          <div className="flex gap-1.5">
+                            <Input className="h-8" type="number" placeholder="0" value={asigForm.uf_value}
+                              onChange={(e) => setAsigForm({ ...asigForm, uf_value: e.target.value })}
+                            />
+                            <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={fetchUfActual} disabled={fetchingUf} title="Obtener UF actual">
+                              <RefreshCw className={`h-3.5 w-3.5 ${fetchingUf ? "animate-spin" : ""}`} />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
-              )}
-            </div>
+              );
+            })()}
 
             {editingAsig && (
               <div className="space-y-1">

@@ -49,7 +49,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
           <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
-            <img src="/Logo_Siroe_opc_2.png" alt="Siroe" className="w-56 h-auto" />
+            <img src="/logo-solvitec-full.png" alt="Solvitec" className="w-56 h-auto" />
             <div className="text-center">
               <h1 className="text-xl font-semibold text-foreground">
                 {mode === "login" ? "Iniciar sesión" : "Recuperar cuenta"}

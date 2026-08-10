@@ -100,6 +100,7 @@ export default function EditarCotizacion() {
   const [items, setItems] = useState<LineItem[]>([]);
   const [deletedItemIds, setDeletedItemIds] = useState<string[]>([]);
   const [createdBy, setCreatedBy] = useState<string>("");
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [usuarios, setUsuarios] = useState<ApiUser[]>([]);
   const [tecnicos, setTecnicos] = useState<ApiTecnico[]>([]);
 
@@ -132,6 +133,7 @@ export default function EditarCotizacion() {
           setTerms(cotData.terms ?? "");
           setTechDescription(cotData.techDescription ?? "");
           setCreatedBy(cotData.createdBy ?? "");
+          setDiscountPercent((cotData as any).discountPercent ?? 0);
           if (cotData.items) {
             setItems(
               cotData.items.map((i) => ({
@@ -191,7 +193,9 @@ export default function EditarCotizacion() {
         const base = i.quantity * i.unitPrice;
         return sum + (i.currency === "UF" ? base * ufValue : base);
       }, 0);
-      const ivaAmount = netTotal * 0.19;
+      const discountAmount = netTotal * discountPercent / 100;
+      const discountedNeto = netTotal - discountAmount;
+      const ivaAmount = discountedNeto * 0.19;
       await generateCotizacionPDF({
         cotizacionId: id!,
         cliente: selectedCliente,
@@ -201,11 +205,12 @@ export default function EditarCotizacion() {
         ufValue,
         netTotal,
         ivaAmount,
-        grandTotal: netTotal + ivaAmount,
+        grandTotal: discountedNeto + ivaAmount,
         version,
         validityDays,
         terms,
         requesterName,
+        discountPercent,
       });
       toast.success(`PDF ${id} v${version} descargado`);
     } catch {
@@ -259,6 +264,7 @@ export default function EditarCotizacion() {
         currency: hasUF ? "MIXTO" : "CLP",
         uf_value: hasUF ? ufValue : null,
         terms: terms.trim() || null,
+        discount_percent: discountPercent,
         items: allItems,
         ...(isAdmin && createdBy && { created_by: createdBy }),
       });
@@ -364,7 +370,7 @@ export default function EditarCotizacion() {
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
               <Input
@@ -398,6 +404,17 @@ export default function EditarCotizacion() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Descuento (%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="0"
+                value={discountPercent}
+                onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
+              />
             </div>
           </div>
         </div>

@@ -25,6 +25,7 @@ export type Cotizacion = {
   validity_days: number;
   created_at: string;
   updated_at: string;
+  discount_percent?: number;
   clientes?: Cliente;
 };
 
@@ -57,6 +58,7 @@ export type CotizacionVersion = {
   requirement: string | null;
   requester_name: string | null;
   uf_value: number | null;
+  discount_percent?: number;
 };
 
 export type Ticket = {

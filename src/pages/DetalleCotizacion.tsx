@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2, X, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Copy, Pencil, Trash2, X, ExternalLink, ChevronDown, ChevronRight, FileDown } from "lucide-react";
+import { generateCotizacionPDF } from "@/lib/generateCotizacionPDF";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -46,6 +47,7 @@ type ApiCotizacionFull = {
   createdAt: string;
   updatedAt: string;
   terms: string | null;
+  discountPercent: number;
   clientes: { name: string; rut: string; email: string; phone: string } | null;
   items: ApiItem[];
   versiones: ApiVersion[];
@@ -80,6 +82,7 @@ type ApiVersion = {
   requirement: string | null;
   requesterName: string | null;
   ufValue: number | null;
+  discountPercent?: number | null;
 };
 
 type ApiDocumento = {
@@ -108,6 +111,7 @@ export default function DetalleCotizacion() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set());
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   const approvalInputRef = useRef<HTMLInputElement>(null);
   const facturaInputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +144,7 @@ export default function DetalleCotizacion() {
             version: data.version,
             uf_value: data.ufValue,
             validity_days: data.validityDays,
+            discount_percent: data.discountPercent ?? 0,
             created_at: data.createdAt,
             updated_at: data.updatedAt,
             clientes: data.clientes,
@@ -190,8 +195,13 @@ export default function DetalleCotizacion() {
             requirement: v.requirement,
             requester_name: v.requesterName,
             uf_value: v.ufValue,
+            discount_percent: v.discountPercent ?? 0,
           }));
           setVersions(mappedVersions);
+          if (mappedVersions.length > 0) {
+            const latest = mappedVersions[mappedVersions.length - 1];
+            setExpandedVersions(new Set([latest.id]));
+          }
 
           const mappedDocumentos: Documento[] = (data.documentos ?? []).map((d) => ({
             id: d.id,
@@ -216,6 +226,11 @@ export default function DetalleCotizacion() {
     const lineTotal = i.quantity * i.unit_price;
     return s + (i.currency === "UF" ? lineTotal * ufValue : lineTotal);
   }, 0);
+  const discountPercent = quote?.discount_percent ?? 0;
+  const discountAmount = total * discountPercent / 100;
+  const discountedNeto = total - discountAmount;
+  const ivaAmount = discountedNeto * 0.19;
+  const grandTotal = discountedNeto + ivaAmount;
 
   const uploadFile = async (file: File, type: string, _prefix: string) => {
     if (!id) return null;
@@ -350,6 +365,54 @@ export default function DetalleCotizacion() {
     }
   };
 
+  const handleGeneratePDF = async (opts?: { version?: typeof versions[0] }) => {
+    if (!quote?.clientes) return;
+    setGeneratingPDF(true);
+    try {
+      const pdfItems = opts?.version?.items_snapshot ?? items;
+      const versionUfValue = opts?.version?.uf_value ?? ufValue;
+      const versionDiscount = opts?.version?.discount_percent ?? discountPercent;
+      const versionNeto = pdfItems.reduce((s, i) => {
+        const lineTotal = i.quantity * i.unit_price;
+        return s + (i.currency === "UF" ? lineTotal * versionUfValue : lineTotal);
+      }, 0);
+      const versionDiscountAmount = versionNeto * versionDiscount / 100;
+      const versionDiscountedNeto = versionNeto - versionDiscountAmount;
+      const versionIva = versionDiscountedNeto * 0.19;
+      const versionGrandTotal = versionDiscountedNeto + versionIva;
+      await generateCotizacionPDF({
+        cotizacionId: quote.id + (opts?.version ? ` v${opts.version.version}` : ""),
+        cliente: { id: quote.client_id, name: quote.clientes.name, rut: quote.clientes.rut, email: quote.clientes.email, phone: quote.clientes.phone, address: "", created_at: "" },
+        executive: opts?.version?.executive ?? quote.executive,
+        requirement: opts?.version?.requirement ?? quote.requirement,
+        items: pdfItems.map((i) => ({
+          id: i.id,
+          service: i.service,
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          currency: i.currency as "CLP" | "UF",
+          category: i.category ?? "",
+          rentalPeriod: i.rental_period ?? undefined,
+          rentalFrom: i.rental_from ? new Date(i.rental_from) : null,
+          rentalTo: i.rental_to ? new Date(i.rental_to) : null,
+        })),
+        ufValue: versionUfValue,
+        netTotal: versionNeto,
+        ivaAmount: versionIva,
+        grandTotal: versionGrandTotal,
+        version: opts?.version?.version ?? quote.version,
+        validityDays: quote.validity_days,
+        requesterName: opts?.version?.requester_name ?? quote.requester_name ?? undefined,
+        discountPercent: versionDiscount,
+      });
+    } catch {
+      toast.error("Error al generar el PDF");
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Cargando...</p></div>;
 
   if (!quote) return (
@@ -373,6 +436,9 @@ export default function DetalleCotizacion() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 pl-12 sm:pl-0">
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => handleGeneratePDF()} disabled={generatingPDF}>
+            <FileDown className="h-4 w-4" /><span className="hidden sm:inline">{generatingPDF ? "Generando..." : "PDF"}</span>
+          </Button>
           <Button variant="outline" size="sm" className="gap-1" onClick={handleNuevaVersion}>
             <Copy className="h-4 w-4" /><span className="hidden sm:inline">Nueva Versión</span><span className="sm:hidden">Versión</span>
           </Button>
@@ -389,7 +455,7 @@ export default function DetalleCotizacion() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="detalles">
+      <Tabs defaultValue={versions.length > 0 ? "versiones" : "detalles"}>
         <TabsList>
           <TabsTrigger value="detalles">Detalles</TabsTrigger>
           <TabsTrigger value="versiones">Versiones</TabsTrigger>
@@ -480,9 +546,23 @@ export default function DetalleCotizacion() {
                   })}
                 </tbody>
                 <tfoot>
+                  <tr className="border-t">
+                    <td colSpan={5} className="px-5 py-2 text-sm text-right text-muted-foreground">Neto</td>
+                    <td className="px-5 py-2 text-sm text-right font-medium">${Math.round(total).toLocaleString("es-CL")}</td>
+                  </tr>
+                  {discountPercent > 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-2 text-sm text-right text-muted-foreground">Descuento ({discountPercent}%)</td>
+                      <td className="px-5 py-2 text-sm text-right text-destructive font-medium">-${Math.round(discountAmount).toLocaleString("es-CL")}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td colSpan={5} className="px-5 py-2 text-sm text-right text-muted-foreground">IVA (19%)</td>
+                    <td className="px-5 py-2 text-sm text-right font-medium">${Math.round(ivaAmount).toLocaleString("es-CL")}</td>
+                  </tr>
                   <tr className="border-t bg-muted/20">
                     <td colSpan={5} className="px-5 py-3 text-sm font-semibold text-right text-foreground">Total</td>
-                    <td className="px-5 py-3 text-lg font-bold text-right text-primary">${total.toLocaleString("es-CL")}</td>
+                    <td className="px-5 py-3 text-lg font-bold text-right text-primary">${Math.round(grandTotal).toLocaleString("es-CL")}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -533,11 +613,21 @@ export default function DetalleCotizacion() {
                         <span className="font-semibold text-foreground">v{v.version}</span>
                         <span className="text-sm text-muted-foreground">{new Date(v.created_at).toLocaleDateString("es-CL")}</span>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                         {v.total != null && <span className="text-sm font-semibold text-foreground">${v.total.toLocaleString("es-CL")}</span>}
                         <Badge variant="outline" className={v.status === "Vigente" ? "bg-success/10 text-success border-success/20" : "bg-muted text-muted-foreground border-border"}>
                           {v.status}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleGeneratePDF({ version: v })}
+                          disabled={generatingPDF}
+                          title={`PDF v${v.version}`}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
                       </div>
                     </button>
                     {isExpanded && v.items_snapshot && v.items_snapshot.length > 0 && (
