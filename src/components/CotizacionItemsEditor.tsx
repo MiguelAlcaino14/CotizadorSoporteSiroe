@@ -39,6 +39,8 @@ interface Props {
   onUfValueChange: (v: number) => void;
   onItemsChange: (items: LineItem[]) => void;
   onSaveUfValue?: (v: number) => Promise<void>;
+  discountPercent?: number;
+  onDiscountChange?: (v: number) => void;
 }
 
 function itemTotalCLP(item: LineItem, ufValue: number): number {
@@ -68,7 +70,7 @@ function calcRentalPeriod(from: Date, to: Date): string {
   return `${days} ${days === 1 ? "día" : "días"}`;
 }
 
-export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange, onItemsChange, onSaveUfValue }: Props) {
+export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange, onItemsChange, onSaveUfValue, discountPercent = 0, onDiscountChange }: Props) {
   const [savingUf, setSavingUf] = React.useState(false);
   const [fetchingUf, setFetchingUf] = React.useState(false);
   const [productos, setProductos] = React.useState<Producto[]>([]);
@@ -119,8 +121,10 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
   };
 
   const netTotal = items.reduce((sum, i) => sum + itemTotalCLP(i, ufValue), 0);
-  const ivaAmount = netTotal * IVA;
-  const grandTotal = netTotal + ivaAmount;
+  const discountAmount = netTotal * discountPercent / 100;
+  const discountedNeto = netTotal - discountAmount;
+  const ivaAmount = discountedNeto * IVA;
+  const grandTotal = discountedNeto + ivaAmount;
 
   const addItem = () => {
     onItemsChange([
@@ -462,6 +466,31 @@ export default function CotizacionItemsEditor({ items, ufValue, onUfValueChange,
             ${Math.round(netTotal).toLocaleString("es-CL")}
           </span>
         </div>
+        {onDiscountChange && (
+          <div className="flex justify-end items-center gap-10 text-sm">
+            <span className="text-muted-foreground">Descuento</span>
+            <div className="flex items-center gap-1.5 w-36 justify-end">
+              <div className="relative w-20">
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  placeholder="0"
+                  value={discountPercent || ""}
+                  onChange={(e) => onDiscountChange(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
+                  className="h-7 text-sm pr-6 text-right"
+                />
+                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
+              </div>
+              {discountPercent > 0 && (
+                <span className="font-medium text-destructive">
+                  -${Math.round(discountAmount).toLocaleString("es-CL")}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex justify-end gap-10 text-sm">
           <span className="text-muted-foreground">IVA (19%)</span>
           <span className="font-medium text-foreground w-36 text-right">

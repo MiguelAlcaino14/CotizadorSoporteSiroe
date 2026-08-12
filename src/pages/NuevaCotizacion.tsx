@@ -407,18 +407,6 @@ export default function NuevaCotizacion() {
                 onChange={(e) => setValidityDays(Math.max(1, parseInt(e.target.value) || 1))}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>Descuento (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.01}
-                placeholder="0"
-                value={discountPercent || ""}
-                onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
-              />
-            </div>
           </div>
         </div>
 
@@ -428,6 +416,8 @@ export default function NuevaCotizacion() {
             ufValue={ufValue}
             onUfValueChange={setUfValue}
             onItemsChange={setItems}
+            discountPercent={discountPercent}
+            onDiscountChange={setDiscountPercent}
           />
         </div>
 
@@ -452,11 +442,7 @@ export default function NuevaCotizacion() {
           <Button type="button" variant="outline" onClick={() => navigate("/cotizaciones")}>
             Cancelar
           </Button>
-          <Button type="button" variant="outline" className="gap-2" onClick={handleGenerarPDF} disabled={generatingPDF}>
-            {generatingPDF ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-            {generatingPDF ? "Generando..." : "Generar PDF"}
-          </Button>
-          <Button type="submit" disabled={saving}>
+<Button type="submit" disabled={saving}>
             {saving ? "Guardando..." : "Crear Cotización"}
           </Button>
         </div>

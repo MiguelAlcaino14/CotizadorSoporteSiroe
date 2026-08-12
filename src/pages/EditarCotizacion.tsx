@@ -370,7 +370,7 @@ export default function EditarCotizacion() {
               </Select>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label>N° Requerimiento (opcional)</Label>
               <Input
@@ -405,17 +405,6 @@ export default function EditarCotizacion() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label>Descuento (%)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="0"
-                value={discountPercent}
-                onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, Number(e.target.value))))}
-              />
-            </div>
           </div>
         </div>
 
@@ -425,6 +414,8 @@ export default function EditarCotizacion() {
             ufValue={ufValue}
             onUfValueChange={setUfValue}
             onItemsChange={handleItemsChange}
+            discountPercent={discountPercent}
+            onDiscountChange={setDiscountPercent}
             onSaveUfValue={async (v) => {
               try {
                 await api.put(`/cotizaciones/${id}`, { uf_value: v });
